@@ -1,0 +1,39 @@
+mod app;
+mod config;
+mod handlers;
+mod actions;
+mod cli;
+mod logging;
+mod db;
+mod ui;
+mod theme;
+mod query_state;
+
+
+use colored::*;
+use color_eyre::Result;
+use clap::Parser;
+
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    color_eyre::install()?;
+
+    // Set up logging
+    // Should live for the lifetime of the application.
+    let _guard = logging::setup_logging()?;
+
+    if let Err(err) = config::create_config_if_not_exists() {
+        eprintln!("Error creating config files: {}", err);
+        std::process::exit(1);
+    }
+
+    let args = cli::args::AppArgs::parse();
+    if let Err(err) = cli::run(args).await {
+        eprintln!("{}", err.to_string().red());
+        std::process::exit(1);
+    };
+
+    return Ok(());
+}
+
