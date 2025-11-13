@@ -4,7 +4,7 @@ mod handlers;
 mod actions;
 mod cli;
 mod logging;
-mod db;
+mod drivers;
 mod ui;
 mod theme;
 mod query_state;

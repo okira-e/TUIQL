@@ -6,7 +6,7 @@ use color_eyre::{eyre::bail, Result};
 use tabled::{Table, Tabled};
 use url::Url;
 
-use crate::{app, cli::commands::Commands, db, config};
+use crate::{app, cli::commands::Commands, drivers, config};
 
 
 pub async fn run(args: args::AppArgs) -> Result<()> {
@@ -47,13 +47,13 @@ async fn exec_command(command: Commands) -> Result<()> {
 
 /// Connect to the database directly without saving/opening a project.
 async fn connect_directly(args: args::ConnectCmdArgs) -> Result<()> {
-    let db_conn = db::new_connection(&args.r#type, &args.url).await?;
+    let db_driver = drivers::new_connection(&args.r#type, &args.url).await?;
 
     let settings = config::load_settings()?;
     
     let mut app = app::App::new(
         settings,
-        db_conn,
+        db_driver,
     ).await;
     app.init().await?;
     let terminal = ratatui::init();
@@ -78,12 +78,12 @@ async fn open_connection(connection_name: &str) -> Result<()> {
        }
     };
 
-    let db_conn = db::new_connection(&connection.kind, &connection.url).await?;
+    let db_driver = drivers::new_connection(&connection.kind, &connection.url).await?;
 
     let settings = config::load_settings()?;
     let mut app = app::App::new(
         settings,
-        db_conn,
+        db_driver,
     ).await;
     app.init().await?;
     let terminal = ratatui::init();

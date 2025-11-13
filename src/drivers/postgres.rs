@@ -1,19 +1,19 @@
 use async_trait::async_trait;
 use color_eyre::{Result, eyre::bail};
 use futures::TryStreamExt;
-use sqlx::{postgres::PgRow, query::QueryScalar, Postgres, Row};
+use sqlx::{postgres::PgRow, Postgres, Row};
 
 use crate::{
-    db::{self, ColumnMetadata, PaginationStrategy, QueryResult},
+    drivers::{self, ColumnMetadata, PaginationStrategy, QueryResult},
     query_state::Query, utils,
 };
 
 
-pub struct PostgresConnection {
+pub struct PostgresDriver {
     pool: sqlx::postgres::PgPool,
 }
 
-impl PostgresConnection {
+impl PostgresDriver {
    pub async fn new_pool(dsn: &str) -> Result<Self> {
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(10)
@@ -28,7 +28,7 @@ impl PostgresConnection {
 }
 
 #[async_trait]
-impl db::DbConnection for PostgresConnection {
+impl drivers::DbDriver for PostgresDriver {
     async fn get_tables(&self) -> Result<Vec<String>> {
         let rows: Vec<PgRow> = sqlx::query(
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name NOT IN (SELECT inhrelid::regclass::text FROM pg_inherits)",

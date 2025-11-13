@@ -9,15 +9,15 @@ use color_eyre::Result;
 use std::sync::Arc;
 
 use crate::{
-    db::{
-        kinds::DbKinds, postgres::PostgresConnection,
+    drivers::{
+        kinds::DbKinds, postgres::PostgresDriver,
     },
     query_state::Query,
 };
 
 
 #[async_trait]
-pub trait DbConnection: Send + Sync {
+pub trait DbDriver: Send + Sync {
     async fn get_tables(&self) -> Result<Vec<String>>;
     async fn get_views(&self) -> Result<Vec<String>>;
     async fn query(&self, table_name: &str, query: &mut Query) -> Result<QueryResult>;
@@ -27,17 +27,17 @@ pub trait DbConnection: Send + Sync {
     async fn decide_pagination_strategy(&self, table_name: &str) -> Result<PaginationStrategy>;
 }
 
-pub async fn new_connection(kind: &DbKinds, url: &str) -> Result<Arc<dyn DbConnection>> {
+pub async fn new_connection(kind: &DbKinds, url: &str) -> Result<Arc<dyn DbDriver>> {
     return match kind {
         DbKinds::MySQL | DbKinds::Mariadb => {
-            // Ok(Arc::new(MySqlConnection::new_pool(url).await?))
+            // Ok(Arc::new(MySqlDriver::new_pool(url).await?))
             todo!()
         }
         DbKinds::Postgres => {
-            Ok(Arc::new(PostgresConnection::new_pool(url).await?))
+            Ok(Arc::new(PostgresDriver::new_pool(url).await?))
         }
         DbKinds::SQLite => {
-            // Ok(Arc::new(SqliteConnection::new_pool(url).await?))
+            // Ok(Arc::new(SqliteDriver::new_pool(url).await?))
             todo!()
         }
     };

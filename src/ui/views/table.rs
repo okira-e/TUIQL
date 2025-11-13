@@ -14,7 +14,7 @@ use serde_json::Value;
 use crate::actions::DbAction;
 use crate::{
     actions::{Action, ResultsTableAction},
-    db::QueryResult,
+    drivers::QueryResult,
     theme::Theme,
 };
 

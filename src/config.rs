@@ -3,7 +3,7 @@ use color_eyre::{eyre::bail, Result};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::db::kinds::DbKinds;
+use crate::drivers::kinds::DbKinds;
 
 
 #[derive(Debug, Deserialize)]

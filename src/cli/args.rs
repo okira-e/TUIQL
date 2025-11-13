@@ -1,6 +1,6 @@
 use clap::{Args, Parser};
 
-use crate::{cli, db};
+use crate::{cli, drivers};
 
 
 #[derive(Debug, Parser)]
@@ -18,7 +18,7 @@ pub struct AppArgs {
 pub struct ConnectCmdArgs {
     /// If provided along with a url, opens the connection directly.
     #[arg(long)]
-    pub r#type: db::kinds::DbKinds,
+    pub r#type: drivers::kinds::DbKinds,
 
     #[arg(long)]
     pub url: String,

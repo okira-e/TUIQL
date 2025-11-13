@@ -1,4 +1,4 @@
-use crate::db::QueryResult;
+use crate::drivers::QueryResult;
 
 #[derive(Debug, Clone)]
 pub enum Action {

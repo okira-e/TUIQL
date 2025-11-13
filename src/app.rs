@@ -8,7 +8,7 @@ use tracing::debug;
 use crate::{
     actions::{Action, AppAction, DbAction, ResultsTableAction},
     config::Settings,
-    db::{self, DbConnection, QueryResult},
+    drivers::{self, DbDriver, QueryResult},
     query_state::Query,
     theme::{Flavor, Theme},
     ui::{Pane, UI},
@@ -20,10 +20,10 @@ pub struct App {
     pub action_tx: mpsc::UnboundedSender<Action>,
     pub action_rx: mpsc::UnboundedReceiver<Action>,
     pub ui: UI,
-    pub results: db::QueryResult,
+    pub results: drivers::QueryResult,
     pub query_state: Query,
     settings: Settings,
-    db_conn: Arc<dyn DbConnection>,
+    db_driver: Arc<dyn DbDriver>,
     theme: Theme,
     selected_table: Option<String>,
     selected_table_row_count: usize,
@@ -32,7 +32,7 @@ pub struct App {
 impl App {
     pub async fn new(
         settings: Settings,
-        db_conn: Arc<dyn db::DbConnection>,
+        db_driver: Arc<dyn drivers::DbDriver>,
     ) -> Self {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
 
@@ -46,9 +46,9 @@ impl App {
             event_stream: EventStream::new(),
             action_tx,
             action_rx,
-            db_conn,
+            db_driver,
             ui,
-            results: db::QueryResult::default(),
+            results: drivers::QueryResult::default(),
             query_state: Query::new(),
             theme,
             selected_table: None,
@@ -57,8 +57,8 @@ impl App {
     }
 
     pub async fn init(&mut self) -> Result<()> {
-        let tables: Vec<String> = self.db_conn.get_tables().await?;
-        let views: Vec<String> = self.db_conn.get_views().await?;
+        let tables: Vec<String> = self.db_driver.get_tables().await?;
+        let views: Vec<String> = self.db_driver.get_views().await?;
 
         self.ui.explorer.set_items(tables, views);
 
@@ -123,7 +123,7 @@ impl App {
             DbAction::QueryTable(table_name) => {
                 self.results = self.fetch_data(&table_name).await?;
                 if self.selected_table_row_count == 0 {
-                    self.selected_table_row_count = self.db_conn.query_count(&table_name, &mut self.query_state).await?;
+                    self.selected_table_row_count = self.db_driver.query_count(&table_name, &mut self.query_state).await?;
                 }
                 
                 self.ui.focused_pane = Pane::Right;
@@ -181,7 +181,7 @@ impl App {
         // Sort by the primary key(s) by default. If no order by was specified
         // by the user.
         if self.query_state.order_by.is_empty() {
-            let pk_cols = self.db_conn.get_pk_columns(&table_name).await?;
+            let pk_cols = self.db_driver.get_pk_columns(&table_name).await?;
             if pk_cols.is_empty() {
                 self.query_state.order_by = String::new()
             } else {
@@ -190,7 +190,7 @@ impl App {
         }
 
         return Ok(
-            self.db_conn.query(&table_name, &mut self.query_state).await?
+            self.db_driver.query(&table_name, &mut self.query_state).await?
         );
     }
 }
