@@ -38,11 +38,13 @@ pub enum ExplorerAction {
 
 #[derive(Debug, Clone)]
 pub enum ResultsTableAction {
-  SetResults(QueryResult),
+  SetResults(QueryResult, usize, usize),
 }
 
 #[derive(Debug, Clone)]
 pub enum DbAction {
     QueryTable(String),
     QueryStatement(String),
+    NextPage,
+    PrevPage,
 }

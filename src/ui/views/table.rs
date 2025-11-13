@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::cell::RefCell;
 
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::widgets::{Cell, Row, Table, TableState};
@@ -11,6 +11,7 @@ use ratatui::{
 };
 use serde_json::Value;
 
+use crate::actions::DbAction;
 use crate::{
     actions::{Action, ResultsTableAction},
     db::QueryResult,
@@ -21,9 +22,9 @@ pub struct TableView {
     pub title: String,
     columns: Vec<String>,
     query_result: Option<QueryResult>,
-    visible_lines_start: usize,
-    visible_lines_end: usize,
-    fetched_total_ros: usize,
+    results_row_count: usize,
+    total_row_count: usize,
+    offset: usize,
     /// Dictates how many columns to skip horizontally
     horizontal_scroll_offset: usize,
     table_state: RefCell<TableState>,
@@ -36,9 +37,9 @@ impl TableView {
             title: String::from(title),
             columns: vec![],
             query_result: None,
-            visible_lines_start: 0,
-            visible_lines_end: 0,
-            fetched_total_ros: 0,
+            results_row_count: 0,
+            total_row_count: 0,
+            offset: 0,
             horizontal_scroll_offset: 0,
             table_state: RefCell::new(TableState::default()),
             draw_scrollbar: false,
@@ -50,11 +51,12 @@ impl TableView {
 
         let row_status = format!(
             "{}-{}/{}",
-            self.visible_lines_start, self.visible_lines_end, self.fetched_total_ros,
+            self.offset, self.results_row_count, self.total_row_count,
         );
+
         let container_block = Block::default()
             .title(self.title.clone())
-            .title(Line::from(row_status).alignment(Alignment::Right))
+            .title(Line::from(row_status.clone()).alignment(Alignment::Right))
             .border_style(container_border_style)
             .borders(Borders::ALL);
 
@@ -192,7 +194,10 @@ impl TableView {
 
     pub fn update(&mut self, action: ResultsTableAction) {
         match action {
-            ResultsTableAction::SetResults(query_result) => {
+            ResultsTableAction::SetResults(query_result, total_row_count, offset) => {
+                self.results_row_count = query_result.rows.len();
+                self.total_row_count = total_row_count;
+                self.offset = offset;
                 self.query_result = Some(query_result);
                 self.table_state.borrow_mut().select(Some(0));
             }
@@ -286,6 +291,14 @@ impl TableView {
             (_, KeyCode::Char('G')) => {
                 state.select(Some(total_rows - 1));
                 Action::None
+            }
+
+            (_, KeyCode::Char('n')) => {
+                Action::Db(DbAction::NextPage)
+            }
+
+            (_, KeyCode::Char('p')) => {
+                Action::Db(DbAction::PrevPage)
             }
 
             _ => Action::None,

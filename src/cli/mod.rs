@@ -33,14 +33,6 @@ pub async fn run(args: args::AppArgs) -> Result<()> {
 
 async fn exec_command(command: Commands) -> Result<()> {
     return match command {
-        Commands::Init => {
-            if let Err(err) = config::create_config_if_not_exists() {
-                bail!("Error creating config files: {}", err);
-            }
-
-            println!("Config files are created.");
-            Ok(())
-        }
         Commands::Connect(args) => {
             connect_directly(args).await
         }

@@ -2,7 +2,6 @@ pub mod kinds;
 // pub mod mysql;
 pub mod postgres;
 // pub mod sqlite;
-mod shared;
 
 
 use async_trait::async_trait;
@@ -21,9 +20,11 @@ use crate::{
 pub trait DbConnection: Send + Sync {
     async fn get_tables(&self) -> Result<Vec<String>>;
     async fn get_views(&self) -> Result<Vec<String>>;
-    async fn query_table(&self, name: &str, query: &Query) -> Result<QueryResult>;
-    async fn get_pk_columns(&self, name: &str) -> Result<Vec<String>>;
-    async fn get_columns(&self, name: &str) -> Result<Vec<ColumnMetadata>>;
+    async fn query(&self, table_name: &str, query: &mut Query) -> Result<QueryResult>;
+    async fn query_count(&self, table_name: &str, query: &Query) -> Result<usize>;
+    async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>>;
+    async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>>;
+    async fn decide_pagination_strategy(&self, table_name: &str) -> Result<PaginationStrategy>;
 }
 
 pub async fn new_connection(kind: &DbKinds, url: &str) -> Result<Arc<dyn DbConnection>> {
@@ -57,4 +58,10 @@ pub struct ColumnMetadata {
     pub name: String,
     pub data_type: String,
     pub is_nullable: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum PaginationStrategy {
+    Cursor(String),
+    Offset,
 }

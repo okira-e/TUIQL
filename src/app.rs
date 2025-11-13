@@ -8,7 +8,7 @@ use tracing::debug;
 use crate::{
     actions::{Action, AppAction, DbAction, ResultsTableAction},
     config::Settings,
-    db::{self, DbConnection},
+    db::{self, DbConnection, QueryResult},
     query_state::Query,
     theme::{Flavor, Theme},
     ui::{Pane, UI},
@@ -25,6 +25,8 @@ pub struct App {
     settings: Settings,
     db_conn: Arc<dyn DbConnection>,
     theme: Theme,
+    selected_table: Option<String>,
+    selected_table_row_count: usize,
 }
 
 impl App {
@@ -49,6 +51,8 @@ impl App {
             results: db::QueryResult::default(),
             query_state: Query::new(),
             theme,
+            selected_table: None,
+            selected_table_row_count: 0,
         };
     }
 
@@ -88,6 +92,10 @@ impl App {
         return Ok(());
     }
     
+    pub fn quit(&mut self) {
+        self.running = false;
+    }
+
     async fn handle_app_action(&mut self, action: AppAction) -> Result<()> {
         match action {
             AppAction::Quit => {
@@ -102,6 +110,7 @@ impl App {
             },
             AppAction::SelectTable(name) => {
                 self.query_state = Query::new();
+                self.selected_table_row_count = 0;
                 self.handle_db_action(DbAction::QueryTable(name)).await?;
             },
         }
@@ -111,30 +120,77 @@ impl App {
 
     async fn handle_db_action(&mut self, action: DbAction) -> Result<()> {
         match action {
-            DbAction::QueryTable(name) => {
-                // Sort by the primary key(s) by default. If no order by was specified
-                // by the user.
-                if self.query_state.order_by.is_empty() {
-                    let pk_cols = self.db_conn.get_pk_columns(&name).await?;
-                    if pk_cols.is_empty() {
-                        self.query_state.order_by = String::new()
-                    } else {
-                        self.query_state.order_by = format!(" ORDER BY {}", pk_cols.join(", "));
-                    }
+            DbAction::QueryTable(table_name) => {
+                self.results = self.fetch_data(&table_name).await?;
+                if self.selected_table_row_count == 0 {
+                    self.selected_table_row_count = self.db_conn.query_count(&table_name, &mut self.query_state).await?;
                 }
-
-                self.results = self.db_conn.query_table(&name, &self.query_state).await?;
+                
                 self.ui.focused_pane = Pane::Right;
-                self.ui.update(Action::ResultsTable(ResultsTableAction::SetResults(self.results.clone())));
+                self.ui.update(
+                    Action::ResultsTable(
+                        ResultsTableAction::SetResults(
+                            self.results.clone(),
+                            self.selected_table_row_count,
+                            self.query_state.offset,
+                        )
+                    )
+                );
             },
             DbAction::QueryStatement(_) => todo!(),
+            DbAction::NextPage => {
+                if let Some(selected_table) = &self.selected_table {
+                    let new_offset = self.query_state.offset + self.query_state.limit;
+                    self.query_state.offset = new_offset;
+                    self.results = self.fetch_data(&selected_table.clone()).await?;
+                    self.ui.update(
+                        Action::ResultsTable(
+                            ResultsTableAction::SetResults(
+                                self.results.clone(),
+                                self.selected_table_row_count,
+                                self.query_state.offset,
+                            )
+                        )
+                    );
+                }
+            }
+            DbAction::PrevPage => {
+                if let Some(selected_table) = &self.selected_table {
+                    let new_offset = self.query_state.offset.saturating_sub(self.query_state.limit);
+                    self.query_state.offset = new_offset;
+                    self.results = self.fetch_data(&selected_table.clone()).await?;
+                    self.ui.update(
+                        Action::ResultsTable(
+                            ResultsTableAction::SetResults(
+                                self.results.clone(),
+                                self.selected_table_row_count,
+                                self.query_state.offset,
+                            )
+                        )
+                    );
+                }
+            }
         };
 
         return Ok(());
     }
     
-    /// Set running to false to quit the application.
-    pub fn quit(&mut self) {
-        self.running = false;
+    // @Reusability
+    async fn fetch_data(&mut self, table_name: &str) -> Result<QueryResult> {
+        self.selected_table = Some(table_name.to_owned());
+        // Sort by the primary key(s) by default. If no order by was specified
+        // by the user.
+        if self.query_state.order_by.is_empty() {
+            let pk_cols = self.db_conn.get_pk_columns(&table_name).await?;
+            if pk_cols.is_empty() {
+                self.query_state.order_by = String::new()
+            } else {
+                self.query_state.order_by = format!(" ORDER BY {}", pk_cols.join(", "));
+            }
+        }
+
+        return Ok(
+            self.db_conn.query(&table_name, &mut self.query_state).await?
+        );
     }
 }

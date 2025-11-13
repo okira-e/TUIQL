@@ -8,6 +8,7 @@ mod db;
 mod ui;
 mod theme;
 mod query_state;
+mod utils;
 
 
 use colored::*;
@@ -19,14 +20,14 @@ use clap::Parser;
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    // Set up logging
-    // Should live for the lifetime of the application.
-    let _guard = logging::setup_logging()?;
-
     if let Err(err) = config::create_config_if_not_exists() {
         eprintln!("Error creating config files: {}", err);
         std::process::exit(1);
     }
+    
+    // Set up logging
+    // Should live for the lifetime of the application.
+    let _guard = logging::setup_logging()?;
 
     let args = cli::args::AppArgs::parse();
     if let Err(err) = cli::run(args).await {
