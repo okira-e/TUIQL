@@ -7,7 +7,6 @@ mod logging;
 mod drivers;
 mod ui;
 mod theme;
-mod query_state;
 mod utils;
 
 

@@ -6,35 +6,33 @@ pub mod postgres;
 
 use async_trait::async_trait;
 use color_eyre::Result;
-use std::sync::Arc;
 
-use crate::{
-    drivers::{
-        kinds::DbKinds, postgres::PostgresDriver,
-    },
-    query_state::Query,
-};
+use crate::drivers::{kinds::DbKinds, postgres::PostgresDriver};
 
 
 #[async_trait]
 pub trait DbDriver: Send + Sync {
     async fn get_tables(&self) -> Result<Vec<String>>;
     async fn get_views(&self) -> Result<Vec<String>>;
-    async fn query(&self, table_name: &str, query: &mut Query) -> Result<QueryResult>;
-    async fn query_count(&self, table_name: &str, query: &Query) -> Result<usize>;
+    async fn query(&mut self, table_name: &str) -> Result<QueryResult>;
+    async fn query_count(&self, table_name: &str) -> Result<usize>;
     async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>>;
     async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>>;
-    async fn decide_pagination_strategy(&self, table_name: &str) -> Result<PaginationStrategy>;
+    async fn get_pagination_strategy(&self, table_name: &str) -> Result<PaginationStrategy>;
+    async fn next_page(&mut self, table_name: &str, total_row_count: usize) -> Result<()>;
+    async fn prev_page(&mut self, table_name: &str) -> Result<()>;
+    fn reset_query_state(&mut self);
+    async fn get_current_page(&self, table_name: &str) -> Result<usize>;
 }
 
-pub async fn new_connection(kind: &DbKinds, url: &str) -> Result<Arc<dyn DbDriver>> {
+pub async fn new_connection(kind: &DbKinds, url: &str) -> Result<Box<dyn DbDriver>> {
     return match kind {
         DbKinds::MySQL | DbKinds::Mariadb => {
             // Ok(Arc::new(MySqlDriver::new_pool(url).await?))
             todo!()
         }
         DbKinds::Postgres => {
-            Ok(Arc::new(PostgresDriver::new_pool(url).await?))
+            Ok(Box::new(PostgresDriver::new_pool(url).await?))
         }
         DbKinds::SQLite => {
             // Ok(Arc::new(SqliteDriver::new_pool(url).await?))
@@ -62,6 +60,7 @@ pub struct ColumnMetadata {
 
 #[derive(Debug, Clone)]
 pub enum PaginationStrategy {
+    /// Holds the cursor based column
     Cursor(String),
     Offset,
 }

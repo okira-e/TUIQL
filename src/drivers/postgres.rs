@@ -1,16 +1,41 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use color_eyre::{Result, eyre::bail};
+use dashmap::DashMap;
 use futures::TryStreamExt;
 use sqlx::{postgres::PgRow, Postgres, Row};
 
-use crate::{
-    drivers::{self, ColumnMetadata, PaginationStrategy, QueryResult},
-    query_state::Query, utils,
-};
+use crate::{ drivers::{self, ColumnMetadata, PaginationStrategy, QueryResult}, utils};
 
+
+#[derive(Debug, Default, Clone)]
+pub struct Query {
+    pub limit: usize,
+    pub offset: usize,
+    pub where_clause: String,
+    pub group_by: String,
+    pub order_by: String,
+    pub cursor_history: HashMap<String, Vec<usize>>,
+}
+
+impl Query {
+    pub fn new() -> Self {
+        return Self {
+            limit: 200,
+            offset: 0,
+            where_clause: String::new(),
+            group_by: String::new(),
+            order_by: String::new(),
+            cursor_history: HashMap::new(),
+        };
+    }
+}
 
 pub struct PostgresDriver {
     pool: sqlx::postgres::PgPool,
+    pagination_strategy_cache: DashMap<String, PaginationStrategy>,
+    query_state: Query,
 }
 
 impl PostgresDriver {
@@ -23,6 +48,8 @@ impl PostgresDriver {
 
         return Ok(Self {
             pool,
+            pagination_strategy_cache: DashMap::new(),
+            query_state: Query::new(),
         });
     } 
 }
@@ -59,21 +86,32 @@ impl drivers::DbDriver for PostgresDriver {
         return Ok(views);
     }
     
-    async fn query(&self, table_name: &str, query: &mut Query) -> Result<QueryResult> {
+    async fn query(&mut self, table_name: &str) -> Result<QueryResult> {
         if table_name.trim().is_empty() {
             bail!("Table/view name cannot be empty");
         }
 
-        let limit = if query.limit > 0 { query.limit } else { 100 };
+        // Sort by the primary key(s) by default. If no order by was specified
+        // by the user.
+        if self.query_state.order_by.is_empty() {
+            let pk_cols = self.get_pk_columns(&table_name).await?;
+            if pk_cols.is_empty() {
+                self.query_state.order_by = String::new()
+            } else {
+                self.query_state.order_by = format!(" ORDER BY {}", pk_cols.join(", "));
+            }
+        }
+        
+        let limit = if self.query_state.limit > 0 { self.query_state.limit } else { 100 };
 
         let columns = self.get_columns(table_name).await?;
         let ident = utils::quote_ident(table_name);
         
-        let pagination_strategy = self.decide_pagination_strategy(table_name).await?;
+        let pagination_strategy = self.get_pagination_strategy(table_name).await?;
         
         return match pagination_strategy {
             PaginationStrategy::Cursor(column_name) => {
-                let order_direction = if query.order_by.to_uppercase().contains("DESC") {
+                let order_direction = if self.query_state.order_by.to_uppercase().contains("DESC") {
                     "DESC"
                 } else {
                     "ASC"
@@ -97,11 +135,21 @@ impl drivers::DbDriver for PostgresDriver {
                     "#,
                     table = ident,
                     where_clause = where_clause,
-                    order_sql = query.order_by
+                    order_sql = self.query_state.order_by
                 );
 
+                let cursor_pos: usize = match self.query_state.cursor_history.get(table_name) {
+                    None => 0,
+                    Some(cursor_history) => {
+                        match cursor_history.last() {
+                            Some(val) => *val,
+                            None => 0,
+                        }
+                    },
+                };
+
                 let query_builder = sqlx::query_scalar::<Postgres, serde_json::Value>(&sql)
-                    .bind(query.current_cursor_value as i64)
+                    .bind(cursor_pos as i64)
                     .bind(limit as i64);
 
                 let mut stream = query_builder.fetch(&self.pool);
@@ -111,18 +159,28 @@ impl drivers::DbDriver for PostgresDriver {
                     out_rows.push(j);
                 }
                 
-                query.current_cursor_value = out_rows
-                    .last()
-                    .expect("no rows")
-                    .get(column_name)
-                    .expect("missing column")
-                    .as_u64()
-                    .expect("not a number") as usize;
-                
-                Ok(QueryResult {
-                    columns: columns,
-                    rows: out_rows,
-                })
+                return if let Some(last) = out_rows.last() {
+                    let cursor_position = last
+                        .get(column_name)
+                        .expect("missing column")
+                        .as_u64()
+                        .expect("not a number") as usize;
+                    
+                    self.query_state.cursor_history
+                        .entry(table_name.to_string())
+                        .or_insert_with(Vec::new)
+                        .push(cursor_position);
+                    
+                    Ok(QueryResult {
+                        columns: columns,
+                        rows: out_rows,
+                    })
+                } else {
+                    Ok(QueryResult {
+                        columns: vec![],
+                        rows: vec![],
+                    })
+                }
             },
             PaginationStrategy::Offset => {
                 let sql = format!(r#"
@@ -135,11 +193,11 @@ impl drivers::DbDriver for PostgresDriver {
                         LIMIT $1
                         OFFSET $2
                     ) AS t;
-                "#, table = ident, order_sql = query.order_by);
+                "#, table = ident, order_sql = self.query_state.order_by);
                 
                 let mut stream = sqlx::query_scalar::<_, serde_json::Value>(&sql)
                     .bind(limit as i64)
-                    .bind(query.offset as i64)
+                    .bind(self.query_state.offset as i64)
                     .fetch(&self.pool);
                 
                 let mut out_rows: Vec<serde_json::Value> = Vec::with_capacity(limit);
@@ -149,14 +207,14 @@ impl drivers::DbDriver for PostgresDriver {
                 
                 Ok(QueryResult {
                     columns: columns,
-                    rows: out_rows
+                    rows: out_rows,
                 })
             },
         };
     }
     
-    async fn query_count(&self, table_name: &str, query: &Query) -> Result<usize> {
-        let sql = format!("SELECT COUNT(*) AS count FROM {} {}", table_name, query.where_clause);
+    async fn query_count(&self, table_name: &str) -> Result<usize> {
+        let sql = format!("SELECT COUNT(*) AS count FROM {} {}", table_name, self.query_state.where_clause);
 
         let count = sqlx::query(&sql)
             .fetch_one(&self.pool)
@@ -202,7 +260,7 @@ impl drivers::DbDriver for PostgresDriver {
     
         let columns = sqlx::query(sql)
             .bind(table_name)
-            .map(|row: sqlx::postgres::PgRow| ColumnMetadata {
+            .map(|row: PgRow| ColumnMetadata {
                 name: row.get("column_name"),
                 data_type: row.get("data_type"),
                 is_nullable: match row.get::<String, _>("is_nullable").as_str() {
@@ -218,7 +276,15 @@ impl drivers::DbDriver for PostgresDriver {
 
     /// Tries to find a column that can be used for cursor based pagination.
     /// If none are found, it decides the fallback.
-    async fn decide_pagination_strategy(&self, table_name: &str) -> Result<PaginationStrategy> {
+    ///
+    /// This function uses caches result.
+    /// @Todo: Add a command to control this.
+    async fn get_pagination_strategy(&self, table_name: &str) -> Result<PaginationStrategy> {
+        // Check cache
+        if let Some(strat) = self.pagination_strategy_cache.get(table_name) {
+            return Ok(strat.clone());
+        }
+        
         let sql = r#"
             SELECT
                 c.column_name AS column_name
@@ -235,16 +301,77 @@ impl drivers::DbDriver for PostgresDriver {
 
         let columns: Vec<String> = sqlx::query(sql)
             .bind(table_name)
-            .map(|row: sqlx::postgres::PgRow| {
+            .map(|row: PgRow| {
                 row.get("column_name")
             })
             .fetch_all(&self.pool)
             .await?;
         
-        return if !columns.is_empty() {
-            Ok(PaginationStrategy::Cursor(columns[0].clone()))
+        let strat = if !columns.is_empty() {
+            PaginationStrategy::Cursor(columns[0].clone())
         } else {
-            Ok(PaginationStrategy::Offset)
+            PaginationStrategy::Offset
+        };
+        
+        self.pagination_strategy_cache.insert(table_name.to_string(), strat.clone());
+        
+        return Ok(strat);
+    }
+
+    /// Modifies the state so the next fetch returns the next page.
+    /// Returns if the state is new and fetching will yield newer results.
+    async fn next_page(&mut self, table: &str, total: usize) -> Result<()> {
+        match self.get_pagination_strategy(table).await? {
+            PaginationStrategy::Cursor(_) => {
+                // nothing — cursor advanced when fetching
+            }
+            PaginationStrategy::Offset => {
+                let new_offset = self.query_state.offset + self.query_state.limit;
+                if new_offset < total {
+                    self.query_state.offset = new_offset;
+                }
+            }
+        }
+        
+        return Ok(());
+    }
+
+    async fn prev_page(&mut self, table_name: &str) -> Result<()> {
+        match self.get_pagination_strategy(table_name).await? {
+            PaginationStrategy::Cursor(_) => {
+                if let Some(cursor_history) = self.query_state.cursor_history.get_mut(table_name) {
+                    cursor_history.pop();
+                    cursor_history.pop();
+                }
+            }
+            PaginationStrategy::Offset => {
+                let old_offset = self.query_state.offset;
+                let new_offset = self.query_state.offset.saturating_sub(self.query_state.limit);
+                
+                if old_offset != new_offset {
+                    self.query_state.offset = new_offset;
+                }
+            }
+        };
+        
+        return Ok(());
+    }
+    
+    fn reset_query_state(&mut self) {
+        self.query_state = Query::new();
+    }
+    
+    async fn get_current_page(&self, table_name: &str) -> Result<usize> {
+        return match self.get_pagination_strategy(table_name).await? {
+            PaginationStrategy::Cursor(_) => {
+                let pos = self.query_state.cursor_history.get(table_name)
+                    .and_then(|history| history.last().cloned())
+                    .unwrap_or(0);
+                Ok(pos)
+            }
+            PaginationStrategy::Offset => {
+                Ok(self.query_state.offset)
+            }
         };
     }
 }

@@ -173,9 +173,9 @@ impl TableView {
         self.draw_scrollbar = visible_cols.len() < query_result.columns.len();
 
         if self.draw_scrollbar {
-            let scrollbar_width = (1.0
-                / (query_result.columns.len() as f32 / self.columns.len().max(1) as f32))
-                * area.width as f32;
+            let scrollbar_width = (
+                1.0 / (query_result.columns.len() as f32 / self.columns.len().max(1) as f32)
+            ) * area.width as f32;
 
             let offset_width = (1.0 / query_result.columns.len() as f32) * area.width as f32;
             let scrollbar_offset =
@@ -243,12 +243,6 @@ impl TableView {
                     self.horizontal_scroll_offset -= 1;
                 }
 
-                // let offset = query_result.columns.len() - visible_cols.len();
-                // if offset > 0 {
-                //     let col = query_result.columns[offset - 1].clone();
-                //     visible_cols.insert(0, col);
-                // }
-
                 Action::None
             }
 
@@ -293,10 +287,12 @@ impl TableView {
                 Action::None
             }
 
+            // N: go to next page.
             (_, KeyCode::Char('n')) => {
                 Action::Db(DbAction::NextPage)
             }
 
+            // P: go to previous page.
             (_, KeyCode::Char('p')) => {
                 Action::Db(DbAction::PrevPage)
             }

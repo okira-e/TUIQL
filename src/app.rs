@@ -1,15 +1,13 @@
 use color_eyre::Result;
 use crossterm::event::EventStream;
 use ratatui::DefaultTerminal;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::debug;
 
 use crate::{
     actions::{Action, AppAction, DbAction, ResultsTableAction},
     config::Settings,
-    drivers::{self, DbDriver, QueryResult},
-    query_state::Query,
+    drivers::{self, DbDriver},
     theme::{Flavor, Theme},
     ui::{Pane, UI},
 };
@@ -20,10 +18,9 @@ pub struct App {
     pub action_tx: mpsc::UnboundedSender<Action>,
     pub action_rx: mpsc::UnboundedReceiver<Action>,
     pub ui: UI,
-    pub results: drivers::QueryResult,
-    pub query_state: Query,
+    // pub results: drivers::QueryResult,
     settings: Settings,
-    db_driver: Arc<dyn DbDriver>,
+    db_driver: Box<dyn DbDriver>,
     theme: Theme,
     selected_table: Option<String>,
     selected_table_row_count: usize,
@@ -32,7 +29,7 @@ pub struct App {
 impl App {
     pub async fn new(
         settings: Settings,
-        db_driver: Arc<dyn drivers::DbDriver>,
+        db_driver: Box<dyn drivers::DbDriver>,
     ) -> Self {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
 
@@ -48,8 +45,7 @@ impl App {
             action_rx,
             db_driver,
             ui,
-            results: drivers::QueryResult::default(),
-            query_state: Query::new(),
+            // results: drivers::QueryResult::default(),
             theme,
             selected_table: None,
             selected_table_row_count: 0,
@@ -109,7 +105,7 @@ impl App {
                 }
             },
             AppAction::SelectTable(name) => {
-                self.query_state = Query::new();
+                self.db_driver.reset_query_state();
                 self.selected_table_row_count = 0;
                 self.handle_db_action(DbAction::QueryTable(name)).await?;
             },
@@ -121,76 +117,71 @@ impl App {
     async fn handle_db_action(&mut self, action: DbAction) -> Result<()> {
         match action {
             DbAction::QueryTable(table_name) => {
-                self.results = self.fetch_data(&table_name).await?;
+                self.selected_table = Some(table_name.to_owned());
+
+                let results = self.db_driver.query(&table_name).await?;
+
                 if self.selected_table_row_count == 0 {
-                    self.selected_table_row_count = self.db_driver.query_count(&table_name, &mut self.query_state).await?;
+                    self.selected_table_row_count = self.db_driver.query_count(&table_name).await?;
                 }
                 
                 self.ui.focused_pane = Pane::Right;
                 self.ui.update(
                     Action::ResultsTable(
                         ResultsTableAction::SetResults(
-                            self.results.clone(),
+                            results,
                             self.selected_table_row_count,
-                            self.query_state.offset,
+                            self.db_driver.get_current_page(&table_name).await?,
                         )
                     )
                 );
             },
-            DbAction::QueryStatement(_) => todo!(),
             DbAction::NextPage => {
                 if let Some(selected_table) = &self.selected_table {
-                    let new_offset = self.query_state.offset + self.query_state.limit;
-                    self.query_state.offset = new_offset;
-                    self.results = self.fetch_data(&selected_table.clone()).await?;
-                    self.ui.update(
-                        Action::ResultsTable(
-                            ResultsTableAction::SetResults(
-                                self.results.clone(),
-                                self.selected_table_row_count,
-                                self.query_state.offset,
+                    self.db_driver.next_page(
+                        &selected_table,
+                        self.selected_table_row_count,
+                    ).await?;
+                    
+                    let results = self.db_driver.query(selected_table).await?;
+                    
+                    // @Todo: Actions sent this way do not go through the actions channel which means
+                    // we can't apply logging to them for example. We need a fix for recursive calls here.
+                    if !results.rows.is_empty() {
+                        self.ui.update(
+                            Action::ResultsTable(
+                                ResultsTableAction::SetResults(
+                                    results,
+                                    self.selected_table_row_count,
+                                    self.db_driver.get_current_page(&selected_table).await?,
+                                )
                             )
-                        )
-                    );
+                        );
+                    }
                 }
             }
             DbAction::PrevPage => {
                 if let Some(selected_table) = &self.selected_table {
-                    let new_offset = self.query_state.offset.saturating_sub(self.query_state.limit);
-                    self.query_state.offset = new_offset;
-                    self.results = self.fetch_data(&selected_table.clone()).await?;
-                    self.ui.update(
-                        Action::ResultsTable(
-                            ResultsTableAction::SetResults(
-                                self.results.clone(),
-                                self.selected_table_row_count,
-                                self.query_state.offset,
+                    self.db_driver.prev_page(&selected_table).await?;
+
+                    let results = self.db_driver.query(&selected_table).await?;
+
+                    if !results.rows.is_empty() {
+                        self.ui.update(
+                            Action::ResultsTable(
+                                ResultsTableAction::SetResults(
+                                    results,
+                                    self.selected_table_row_count,
+                                    self.db_driver.get_current_page(&selected_table).await?,
+                                )
                             )
-                        )
-                    );
+                        );
+                    }
                 }
             }
+            DbAction::QueryStatement(_) => todo!(),
         };
 
         return Ok(());
-    }
-    
-    // @Reusability
-    async fn fetch_data(&mut self, table_name: &str) -> Result<QueryResult> {
-        self.selected_table = Some(table_name.to_owned());
-        // Sort by the primary key(s) by default. If no order by was specified
-        // by the user.
-        if self.query_state.order_by.is_empty() {
-            let pk_cols = self.db_driver.get_pk_columns(&table_name).await?;
-            if pk_cols.is_empty() {
-                self.query_state.order_by = String::new()
-            } else {
-                self.query_state.order_by = format!(" ORDER BY {}", pk_cols.join(", "));
-            }
-        }
-
-        return Ok(
-            self.db_driver.query(&table_name, &mut self.query_state).await?
-        );
     }
 }
