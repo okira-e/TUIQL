@@ -22,7 +22,6 @@ pub struct App {
     db_driver: Box<dyn DbDriver>,
     theme: Theme,
     selected_table: Option<String>,
-    selected_table_row_count: usize,
 }
 
 impl App {
@@ -47,7 +46,6 @@ impl App {
             // results: drivers::QueryResult::default(),
             theme,
             selected_table: None,
-            selected_table_row_count: 0,
         };
     }
 
@@ -105,7 +103,6 @@ impl App {
             },
             AppAction::SelectTable(name) => {
                 self.db_driver.reset_query_state();
-                self.selected_table_row_count = 0;
                 self.handle_db_action(DbAction::QueryTable(name)).await?;
             },
         }
@@ -120,16 +117,14 @@ impl App {
 
                 let results = self.db_driver.query(&table_name).await?;
 
-                if self.selected_table_row_count == 0 {
-                    self.selected_table_row_count = self.db_driver.query_count(&table_name).await?;
-                }
+                let count = self.db_driver.query_count(&table_name).await?;
                 
                 self.ui.focused_pane = Pane::Right;
                 self.ui.update(
                     Action::ResultsTable(
                         ResultsTableAction::SetResults(
                             results,
-                            self.selected_table_row_count,
+                            count,
                             self.db_driver.get_current_page(&table_name).await?,
                         )
                     )
@@ -137,9 +132,11 @@ impl App {
             },
             DbAction::NextPage => {
                 if let Some(selected_table) = &self.selected_table {
+                    let count = self.db_driver.query_count(selected_table).await?;
+
                     self.db_driver.next_page(
                         &selected_table,
-                        self.selected_table_row_count,
+                        count,
                     ).await?;
                     
                     let results = self.db_driver.query(selected_table).await?;
@@ -151,7 +148,7 @@ impl App {
                             Action::ResultsTable(
                                 ResultsTableAction::SetResults(
                                     results,
-                                    self.selected_table_row_count,
+                                    count,
                                     self.db_driver.get_current_page(&selected_table).await?,
                                 )
                             )
@@ -164,13 +161,14 @@ impl App {
                     self.db_driver.prev_page(&selected_table).await?;
 
                     let results = self.db_driver.query(&selected_table).await?;
+                    let count = self.db_driver.query_count(selected_table).await?;
 
                     if !results.rows.is_empty() {
                         self.ui.update(
                             Action::ResultsTable(
                                 ResultsTableAction::SetResults(
                                     results,
-                                    self.selected_table_row_count,
+                                    count,
                                     self.db_driver.get_current_page(&selected_table).await?,
                                 )
                             )

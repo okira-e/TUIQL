@@ -15,7 +15,7 @@ pub trait DbDriver: Send + Sync {
     async fn get_tables(&self) -> Result<Vec<String>>;
     async fn get_views(&self) -> Result<Vec<String>>;
     async fn query(&mut self, table_name: &str) -> Result<QueryResult>;
-    async fn query_count(&self, table_name: &str) -> Result<usize>;
+    async fn query_count(&mut self, table_name: &str) -> Result<usize>;
     async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>>;
     async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>>;
     async fn get_pagination_strategy(&self, table_name: &str) -> Result<PaginationStrategy>;

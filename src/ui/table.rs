@@ -24,7 +24,7 @@ pub struct TableView {
     query_result: Option<QueryResult>,
     results_row_count: usize,
     total_row_count: usize,
-    offset: usize,
+    current_pos: usize,
     /// Dictates how many columns to skip horizontally
     horizontal_scroll_offset: usize,
     table_state: RefCell<TableState>,
@@ -39,7 +39,7 @@ impl TableView {
             query_result: None,
             results_row_count: 0,
             total_row_count: 0,
-            offset: 0,
+            current_pos: 0,
             horizontal_scroll_offset: 0,
             table_state: RefCell::new(TableState::default()),
             draw_scrollbar: false,
@@ -51,7 +51,7 @@ impl TableView {
 
         let row_status = format!(
             "{}-{}/{}",
-            self.offset, self.results_row_count, self.total_row_count,
+            self.current_pos, self.total_row_count, self.results_row_count,
         );
 
         let container_block = Block::default()
@@ -194,10 +194,10 @@ impl TableView {
 
     pub fn update(&mut self, action: ResultsTableAction) {
         match action {
-            ResultsTableAction::SetResults(query_result, total_row_count, offset) => {
+            ResultsTableAction::SetResults(query_result, total_row_count, page) => {
                 self.results_row_count = query_result.rows.len();
                 self.total_row_count = total_row_count;
-                self.offset = offset;
+                self.current_pos = page;
                 self.query_result = Some(query_result);
                 self.table_state.borrow_mut().select(Some(0));
             }

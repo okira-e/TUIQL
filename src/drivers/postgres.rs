@@ -10,24 +10,28 @@ use crate::{ drivers::{self, ColumnMetadata, PaginationStrategy, QueryResult}, u
 
 
 #[derive(Debug, Default, Clone)]
-pub struct Query {
+pub struct QueryState {
+    pub table_name: Option<String>, // cache only the current table.
     pub limit: usize,
     pub offset: usize,
     pub where_clause: String,
     pub group_by: String,
     pub order_by: String,
     pub cursor_history: HashMap<String, Vec<usize>>,
+    pub row_count: Option<usize>,
 }
 
-impl Query {
+impl QueryState {
     pub fn new() -> Self {
         return Self {
+            table_name: None,
             limit: 200,
             offset: 0,
             where_clause: String::new(),
             group_by: String::new(),
             order_by: String::new(),
             cursor_history: HashMap::new(),
+            row_count: None,
         };
     }
 }
@@ -35,7 +39,7 @@ impl Query {
 pub struct PostgresDriver {
     pool: sqlx::postgres::PgPool,
     pagination_strategy_cache: DashMap<String, PaginationStrategy>,
-    query_state: Query,
+    query_state: QueryState,
 }
 
 impl PostgresDriver {
@@ -49,7 +53,7 @@ impl PostgresDriver {
         return Ok(Self {
             pool,
             pagination_strategy_cache: DashMap::new(),
-            query_state: Query::new(),
+            query_state: QueryState::new(),
         });
     } 
 }
@@ -213,15 +217,34 @@ impl drivers::DbDriver for PostgresDriver {
         };
     }
     
-    async fn query_count(&self, table_name: &str) -> Result<usize> {
-        let sql = format!("SELECT COUNT(*) AS count FROM {} {}", table_name, self.query_state.where_clause);
-
-        let count = sqlx::query(&sql)
+    async fn query_count(&mut self, table_name: &str) -> Result<usize> {
+        let cache_hit = match &self.query_state.table_name {
+            Some(name) if name == table_name => self.query_state.row_count,
+            _ => None,
+        };
+        
+        if let Some(c) = cache_hit {
+            return Ok(c);
+        }
+        
+        let sql = format!(
+            "SELECT COUNT(*) AS count FROM {} {}",
+            table_name,
+            self.query_state.where_clause
+        );
+        
+        let count: i64 = sqlx::query(&sql)
             .fetch_one(&self.pool)
             .await?
-            .get::<i64, _>("count");
-
-        Ok(count as usize)
+            .get("count");
+        
+        let count_usize = count as usize;
+        
+        // update cache
+        self.query_state.table_name = Some(table_name.to_string());
+        self.query_state.row_count = Some(count_usize);
+        
+        Ok(count_usize)
     }
 
     async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>> {
@@ -358,7 +381,7 @@ impl drivers::DbDriver for PostgresDriver {
     }
     
     fn reset_query_state(&mut self) {
-        self.query_state = Query::new();
+        self.query_state = QueryState::new();
     }
     
     async fn get_current_page(&self, table_name: &str) -> Result<usize> {
