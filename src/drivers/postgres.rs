@@ -4,14 +4,17 @@ use async_trait::async_trait;
 use color_eyre::{Result, eyre::bail};
 use dashmap::DashMap;
 use futures::TryStreamExt;
-use sqlx::{postgres::PgRow, Postgres, Row};
+use sqlx::{Postgres, Row, postgres::PgRow};
 
-use crate::{ drivers::{self, ColumnMetadata, PaginationStrategy, QueryResult}, utils};
-
+use crate::{
+    drivers::{self, ColumnMetadata, PaginationStrategy, QueryResult},
+    utils,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct QueryState {
-    pub table_name: Option<String>, // cache only the current table.
+    /// For cache purposes.
+    pub table_name: Option<String>,
     pub limit: usize,
     pub offset: usize,
     pub where_clause: String,
@@ -39,23 +42,27 @@ impl QueryState {
 pub struct PostgresDriver {
     pool: sqlx::postgres::PgPool,
     pagination_strategy_cache: DashMap<String, PaginationStrategy>,
+    pk_columns_cache: DashMap<String, Vec<String>>,
+    table_columns_cache: DashMap<String, Vec<ColumnMetadata>>,
     query_state: QueryState,
 }
 
 impl PostgresDriver {
-   pub async fn new_pool(dsn: &str) -> Result<Self> {
+    pub async fn new_pool(dsn: &str) -> Result<Self> {
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(10)
             .acquire_timeout(std::time::Duration::from_secs(3))
             .connect(dsn)
-        .await?;
+            .await?;
 
         return Ok(Self {
             pool,
             pagination_strategy_cache: DashMap::new(),
+            pk_columns_cache: DashMap::new(),
+            table_columns_cache: DashMap::new(),
             query_state: QueryState::new(),
         });
-    } 
+    }
 }
 
 #[async_trait]
@@ -89,30 +96,21 @@ impl drivers::DbDriver for PostgresDriver {
 
         return Ok(views);
     }
-    
-    async fn query(&mut self, table_name: &str) -> Result<QueryResult> {
-        if table_name.trim().is_empty() {
-            bail!("Table/view name cannot be empty");
-        }
 
-        // Sort by the primary key(s) by default. If no order by was specified
-        // by the user.
-        if self.query_state.order_by.is_empty() {
-            let pk_cols = self.get_pk_columns(&table_name).await?;
-            if pk_cols.is_empty() {
-                self.query_state.order_by = String::new()
-            } else {
-                self.query_state.order_by = format!(" ORDER BY {}", pk_cols.join(", "));
-            }
-        }
+    async fn query(&mut self, table_name: &str) -> Result<QueryResult> {
+        self.query_state.order_by = self.get_order_by_clause(table_name).await?;
         
-        let limit = if self.query_state.limit > 0 { self.query_state.limit } else { 100 };
+        let limit = if self.query_state.limit > 0 {
+            self.query_state.limit
+        } else {
+            100
+        };
 
         let columns = self.get_columns(table_name).await?;
         let ident = utils::quote_ident(table_name);
-        
+
         let pagination_strategy = self.get_pagination_strategy(table_name).await?;
-        
+
         return match pagination_strategy {
             PaginationStrategy::Cursor(column_name) => {
                 let order_direction = if self.query_state.order_by.to_uppercase().contains("DESC") {
@@ -142,13 +140,12 @@ impl drivers::DbDriver for PostgresDriver {
                     order_sql = self.query_state.order_by
                 );
 
+                // cursor_pos is assumed to be an integer serial column
                 let cursor_pos: usize = match self.query_state.cursor_history.get(table_name) {
                     None => 0,
-                    Some(cursor_history) => {
-                        match cursor_history.last() {
-                            Some(val) => *val,
-                            None => 0,
-                        }
+                    Some(cursor_history) => match cursor_history.last() {
+                        Some(val) => *val,
+                        None => 0,
                     },
                 };
 
@@ -162,32 +159,34 @@ impl drivers::DbDriver for PostgresDriver {
                 while let Some(j) = stream.try_next().await? {
                     out_rows.push(j);
                 }
-                
+
                 return if let Some(last) = out_rows.last() {
                     let cursor_position = last
                         .get(column_name)
                         .expect("missing column")
                         .as_u64()
                         .expect("not a number") as usize;
-                    
-                    self.query_state.cursor_history
+
+                    self.query_state
+                        .cursor_history
                         .entry(table_name.to_string())
                         .or_insert_with(Vec::new)
                         .push(cursor_position);
-                    
+
                     Ok(QueryResult {
                         columns: columns,
                         rows: out_rows,
                     })
                 } else {
                     Ok(QueryResult {
-                        columns: vec![],
+                        columns: columns,
                         rows: vec![],
                     })
-                }
-            },
+                };
+            }
             PaginationStrategy::Offset => {
-                let sql = format!(r#"
+                let sql = format!(
+                    r#"
                     SELECT 
                         to_jsonb(t) AS row
                     FROM (
@@ -197,79 +196,130 @@ impl drivers::DbDriver for PostgresDriver {
                         LIMIT $1
                         OFFSET $2
                     ) AS t;
-                "#, table = ident, order_sql = self.query_state.order_by);
-                
+                "#,
+                    table = ident,
+                    order_sql = self.query_state.order_by
+                );
+
                 let mut stream = sqlx::query_scalar::<_, serde_json::Value>(&sql)
                     .bind(limit as i64)
                     .bind(self.query_state.offset as i64)
                     .fetch(&self.pool);
-                
+
                 let mut out_rows: Vec<serde_json::Value> = Vec::with_capacity(limit);
                 while let Some(j) = stream.try_next().await? {
                     out_rows.push(j);
                 }
-                
+
                 Ok(QueryResult {
                     columns: columns,
                     rows: out_rows,
                 })
-            },
+            }
         };
     }
-    
+
     async fn query_count(&mut self, table_name: &str) -> Result<usize> {
         let cache_hit = match &self.query_state.table_name {
             Some(name) if name == table_name => self.query_state.row_count,
             _ => None,
         };
-        
+
         if let Some(c) = cache_hit {
             return Ok(c);
         }
-        
+
+        let ident = utils::quote_ident(table_name);
+
         let sql = format!(
             "SELECT COUNT(*) AS count FROM {} {}",
-            table_name,
-            self.query_state.where_clause
+            ident, self.query_state.where_clause
         );
-        
-        let count: i64 = sqlx::query(&sql)
-            .fetch_one(&self.pool)
-            .await?
-            .get("count");
-        
+
+        let count: i64 = sqlx::query(&sql).fetch_one(&self.pool).await?.get("count");
+
         let count_usize = count as usize;
-        
+
         // update cache
         self.query_state.table_name = Some(table_name.to_string());
         self.query_state.row_count = Some(count_usize);
-        
+
         Ok(count_usize)
+    }
+    
+    async fn get_order_by_clause(&mut self, table_name: &str) -> Result<String> {
+        // Sort by the primary key(s) by default. If no order by was specified
+        // by the user.
+        if self.query_state.order_by.is_empty() {
+            let pk_cols = self.get_pk_columns(&table_name).await?;
+            if pk_cols.is_empty() {
+                return Ok(String::new());
+            } else {
+                return Ok(format!(" ORDER BY {}", pk_cols.join(", ")));
+            }
+        }
+        
+        return Ok(self.query_state.order_by.clone());
     }
 
     async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>> {
-        let sql = r#"
-          SELECT a.attname AS column_name
-          FROM pg_index i
-                   JOIN pg_attribute a ON a.attrelid = i.indrelid
-              AND a.attnum = ANY(i.indkey)
-          WHERE i.indrelid = $1::regclass
-            AND i.indisprimary
-          ORDER BY array_position(i.indkey, a.attnum);
-        "#;
+        // Check cache
+        if let Some(cols) = self.pk_columns_cache.get(table_name) {
+            return Ok(cols.clone());
+        }
         
-        let columns = sqlx::query(sql)
+        let sql = r#"
+            SELECT att.attname AS column_name
+            FROM pg_constraint con
+            JOIN pg_class rel
+                ON rel.oid = con.conrelid
+            JOIN pg_attribute att
+                ON att.attrelid = rel.oid
+               AND att.attnum  = ANY(con.conkey)
+            WHERE con.contype = 'p'
+              AND rel.relname = $1
+            ORDER BY array_position(con.conkey, att.attnum)
+        "#;
+
+        let mut pk_cols = sqlx::query(sql)
             .bind(table_name)
             .fetch_all(&self.pool)
             .await?
             .into_iter()
             .map(|row| row.get::<String, _>("column_name"))
             .collect::<Vec<String>>();
+
+        //
+        // Sort the primary columns so that integer/serial types are first for ordering.
+        //
         
-        return Ok(columns);
+        let all_columns = self.get_columns(table_name).await?;
+        pk_cols.sort_by_key(|col| {
+            let t = all_columns
+                .iter()
+                .find(|c| c.name == *col)
+                .map(|c| c.data_type.as_str())
+                .unwrap_or("");
+            
+            // 0 for integer types, 1 for everything else
+            match t {
+                "integer" | "bigint" | "smallint" |
+                "serial"  | "bigserial" => 0,
+                _ => 1,
+            }
+        });
+        
+        self.pk_columns_cache.insert(table_name.to_string(), pk_cols.clone());
+        
+        return Ok(pk_cols);
     }
 
     async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>> {
+        // Check cache
+        if let Some(cols) = self.table_columns_cache.get(table_name) {
+            return Ok(cols.clone());
+        }
+        
         let sql = r#"
             SELECT
                 column_name,
@@ -280,7 +330,7 @@ impl drivers::DbDriver for PostgresDriver {
               AND table_name = $1
             ORDER BY ordinal_position;
         "#;
-    
+
         let columns = sqlx::query(sql)
             .bind(table_name)
             .map(|row: PgRow| ColumnMetadata {
@@ -293,7 +343,9 @@ impl drivers::DbDriver for PostgresDriver {
             })
             .fetch_all(&self.pool)
             .await?;
-    
+
+        self.table_columns_cache.insert(table_name.to_string(), columns.clone());
+        
         Ok(columns)
     }
 
@@ -308,37 +360,43 @@ impl drivers::DbDriver for PostgresDriver {
             return Ok(strat.clone());
         }
         
-        let sql = r#"
-            SELECT
-                c.column_name AS column_name
-            FROM information_schema.columns c
-                LEFT JOIN pg_index ix
-                    ON c.table_name::regclass = ix.indrelid
-                LEFT JOIN pg_attribute a
-                    ON a.attrelid = ix.indrelid
-                        AND a.attnum = ANY(ix.indkey)
-            WHERE c.table_name = $1
-              AND c.column_default LIKE 'nextval(%' -- SERIAL type
-              AND a.attname = c.column_name
-        "#;
+        let mut ret = PaginationStrategy::Offset;
 
-        let columns: Vec<String> = sqlx::query(sql)
-            .bind(table_name)
-            .map(|row: PgRow| {
-                row.get("column_name")
-            })
-            .fetch_all(&self.pool)
-            .await?;
+        let pk_columns = self.get_pk_columns(table_name).await?;
+        // If a table has a more than one primary key (composite,) no single column 
+        // is guaranteed to be unique on its own. Therefore, pagination remains offset.
+        if pk_columns.len() == 1 {
+            let sql = r#"
+                SELECT
+                    c.column_name AS column_name
+                FROM information_schema.columns c
+                    LEFT JOIN pg_index ix
+                        ON c.table_name::regclass = ix.indrelid
+                    LEFT JOIN pg_attribute a
+                        ON a.attrelid = ix.indrelid
+                            AND a.attnum = ANY(ix.indkey)
+                WHERE c.table_name = $1
+                  AND c.column_default LIKE 'nextval(%' -- SERIAL type
+                  AND a.attname = c.column_name
+            "#;
+    
+            let columns: Vec<String> = sqlx::query(sql)
+                .bind(table_name)
+                .map(|row: PgRow| row.get("column_name"))
+                .fetch_all(&self.pool)
+                .await?;
+    
+            ret = if !columns.is_empty() {
+                PaginationStrategy::Cursor(columns[0].clone())
+            } else {
+                PaginationStrategy::Offset
+            };
+        }
         
-        let strat = if !columns.is_empty() {
-            PaginationStrategy::Cursor(columns[0].clone())
-        } else {
-            PaginationStrategy::Offset
-        };
-        
-        self.pagination_strategy_cache.insert(table_name.to_string(), strat.clone());
-        
-        return Ok(strat);
+        self.pagination_strategy_cache
+            .insert(table_name.to_string(), ret.clone());
+
+        return Ok(ret);
     }
 
     /// Modifies the state so the next fetch returns the next page.
@@ -355,7 +413,7 @@ impl drivers::DbDriver for PostgresDriver {
                 }
             }
         }
-        
+
         return Ok(());
     }
 
@@ -369,32 +427,36 @@ impl drivers::DbDriver for PostgresDriver {
             }
             PaginationStrategy::Offset => {
                 let old_offset = self.query_state.offset;
-                let new_offset = self.query_state.offset.saturating_sub(self.query_state.limit);
-                
+                let new_offset = self
+                    .query_state
+                    .offset
+                    .saturating_sub(self.query_state.limit);
+
                 if old_offset != new_offset {
                     self.query_state.offset = new_offset;
                 }
             }
         };
-        
+
         return Ok(());
     }
-    
+
     fn reset_query_state(&mut self) {
         self.query_state = QueryState::new();
     }
-    
+
     async fn get_current_page(&self, table_name: &str) -> Result<usize> {
         return match self.get_pagination_strategy(table_name).await? {
             PaginationStrategy::Cursor(_) => {
-                let pos = self.query_state.cursor_history.get(table_name)
+                let pos = self
+                    .query_state
+                    .cursor_history
+                    .get(table_name)
                     .and_then(|history| history.last().cloned())
                     .unwrap_or(0);
                 Ok(pos)
             }
-            PaginationStrategy::Offset => {
-                Ok(self.query_state.offset)
-            }
+            PaginationStrategy::Offset => Ok(self.query_state.offset),
         };
     }
 }

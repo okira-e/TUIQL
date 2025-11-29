@@ -22,6 +22,7 @@ pub struct TableView {
     pub title: String,
     columns: Vec<String>,
     query_result: Option<QueryResult>,
+    table_name: String,
     results_row_count: usize,
     total_row_count: usize,
     current_pos: usize,
@@ -37,6 +38,7 @@ impl TableView {
             title: String::from(title),
             columns: vec![],
             query_result: None,
+            table_name: String::new(),
             results_row_count: 0,
             total_row_count: 0,
             current_pos: 0,
@@ -56,7 +58,8 @@ impl TableView {
 
         let container_block = Block::default()
             .title(self.title.clone())
-            .title(Line::from(row_status.clone()).alignment(Alignment::Right))
+            .title(Line::from(self.table_name.clone()).alignment(Alignment::Right))
+            .title_bottom(Line::from(row_status.clone()).alignment(Alignment::Center))
             .border_style(container_border_style)
             .borders(Borders::ALL);
 
@@ -167,7 +170,7 @@ impl TableView {
         frame.render_stateful_widget(table, table_area, &mut self.table_state.borrow_mut());
 
         //
-        // Render the scrollbar
+        // Render the horizontal scrollbar
         //
 
         self.draw_scrollbar = visible_cols.len() < query_result.columns.len();
@@ -194,7 +197,8 @@ impl TableView {
 
     pub fn update(&mut self, action: ResultsTableAction) {
         match action {
-            ResultsTableAction::SetResults(query_result, total_row_count, page) => {
+            ResultsTableAction::SetResults(table_name, query_result, total_row_count, page) => {
+                self.table_name = table_name;
                 self.results_row_count = query_result.rows.len();
                 self.total_row_count = total_row_count;
                 self.current_pos = page;

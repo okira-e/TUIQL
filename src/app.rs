@@ -123,6 +123,7 @@ impl App {
                 self.ui.update(
                     Action::ResultsTable(
                         ResultsTableAction::SetResults(
+                            table_name.clone(),
                             results,
                             count,
                             self.db_driver.get_current_page(&table_name).await?,
@@ -147,6 +148,7 @@ impl App {
                         self.ui.update(
                             Action::ResultsTable(
                                 ResultsTableAction::SetResults(
+                                    selected_table.clone(),
                                     results,
                                     count,
                                     self.db_driver.get_current_page(&selected_table).await?,
@@ -167,6 +169,7 @@ impl App {
                         self.ui.update(
                             Action::ResultsTable(
                                 ResultsTableAction::SetResults(
+                                    selected_table.clone(),
                                     results,
                                     count,
                                     self.db_driver.get_current_page(&selected_table).await?,

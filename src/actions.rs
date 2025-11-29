@@ -38,7 +38,7 @@ pub enum ExplorerAction {
 
 #[derive(Debug, Clone)]
 pub enum ResultsTableAction {
-  SetResults(QueryResult, usize, usize),
+  SetResults(String, QueryResult, usize, usize),
 }
 
 #[derive(Debug, Clone)]
