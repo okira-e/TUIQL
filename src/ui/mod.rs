@@ -1,4 +1,5 @@
-pub mod views;
+pub mod explorer;
+pub mod table;
 
 use std::collections::HashMap;
 
@@ -11,7 +12,7 @@ use ratatui::{
 use crate::{
     actions::Action,
     theme::Theme,
-    ui::views::{explorer::ExplorerView, table::TableView},
+    ui::{explorer::ExplorerView, table::TableView},
 };
 
 

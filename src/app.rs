@@ -18,7 +18,6 @@ pub struct App {
     pub action_tx: mpsc::UnboundedSender<Action>,
     pub action_rx: mpsc::UnboundedReceiver<Action>,
     pub ui: UI,
-    // pub results: drivers::QueryResult,
     settings: Settings,
     db_driver: Box<dyn DbDriver>,
     theme: Theme,
