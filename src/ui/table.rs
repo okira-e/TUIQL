@@ -58,8 +58,20 @@ impl TableView {
 
         let container_block = Block::default()
             .title(self.title.clone())
-            .title(Line::from(self.table_name.clone()).alignment(Alignment::Right))
-            .title_bottom(Line::from(row_status.clone()).alignment(Alignment::Center))
+            .title(
+                Line::from(
+                    self.table_name.clone()
+                )
+                .style(theme.fg)
+                .alignment(Alignment::Right)
+            )
+            .title_bottom(
+                Line::from(
+                    row_status.clone()
+                )
+                .style(theme.fg)
+                .alignment(Alignment::Center)
+            )
             .border_style(container_border_style)
             .borders(Borders::ALL);
 
