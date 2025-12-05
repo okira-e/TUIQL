@@ -1,5 +1,4 @@
 use crate::app::{App, View};
-use crate::statusline::StatusLineMsgKind;
 
 use color_eyre::Result;
 use tracing::debug;
@@ -37,11 +36,7 @@ impl App {
             },
             AppAction::SelectTable(name) => {
                 self.db_driver.reset_query_state();
-                self.update_db(DbAction::QueryTable(name)).await?;
-                self.statusline_state.report_message(
-                    format!("Fetched {} rows", self.query_result.rows.len()), 
-                    StatusLineMsgKind::Success
-                );
+                _ = self.action_tx.send(Action::Db(DbAction::QueryTable(name)));
             },
             AppAction::Resize(w, h) => {
                 self.area.width = w;
