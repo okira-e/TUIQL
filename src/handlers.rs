@@ -118,6 +118,9 @@ impl App {
                     _ => Action::None,
                 }
             },
+            View::StatusLine => {
+                todo!()
+            },
         };
     }
 }

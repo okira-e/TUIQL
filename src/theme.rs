@@ -7,6 +7,7 @@ pub struct Theme {
     pub accent: Style,
     pub selection: Style,
     pub error: Style,
+    pub success: Style,
     pub pane_focus: Style,
 }
 
@@ -23,6 +24,7 @@ impl Theme {
             accent:     Style::new().fg(p.flamingo),
             selection:  Style::new().fg(p.green),
             error:      Style::new().fg(p.red),
+            success:    Style::new().fg(p.green),
             pane_focus: Style::new().fg(p.blue),
         }
     }

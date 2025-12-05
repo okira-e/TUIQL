@@ -12,6 +12,7 @@ mod theme;
 mod utils;
 mod results_table;
 mod explorer;
+mod statusline;
 
 
 use colored::*;

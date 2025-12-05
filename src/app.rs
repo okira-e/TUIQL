@@ -1,11 +1,5 @@
 use crate::{
-    actions::Action,
-    config::Settings,
-    drivers::{self, DbDriver, QueryResult},
-    explorer::ExplorerState,
-    results_table::ResultsTableState,
-    theme::{Flavor, Theme},
-    ui::explorer_view::ExplorerItem,
+    actions::Action, config::Settings, drivers::{self, DbDriver, QueryResult}, explorer::ExplorerState, results_table::ResultsTableState, statusline::StatusLineState, theme::{Flavor, Theme}, ui::explorer_view::ExplorerItem
 };
 use color_eyre::Result;
 use crossterm::event::EventStream;
@@ -17,6 +11,7 @@ use tokio::sync::mpsc;
 pub enum View {
     Explorer,
     ResultsTable,
+    StatusLine,
 }
 
 pub struct App {
@@ -27,6 +22,7 @@ pub struct App {
     pub focused_view: View,
     pub results_table_state: ResultsTableState,
     pub explorer_state: ExplorerState,
+    pub statusline_state: StatusLineState,
     pub query_result: QueryResult,
     pub settings: Settings,
     pub db_driver: Box<dyn DbDriver>,
@@ -57,6 +53,7 @@ impl App {
             query_result: QueryResult::default(),
             results_table_state: ResultsTableState::default(),
             explorer_state: ExplorerState::default(),
+            statusline_state: StatusLineState::new(),
             area: Rect::default(),
         };
     }

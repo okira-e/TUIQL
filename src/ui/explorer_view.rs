@@ -59,7 +59,6 @@ impl ExplorerView {
             layout_constraints_arr.push(Constraint::Length(views_count as u16));
         }
 
-
         // Render outer block and get the inner rect
         frame.render_widget(&container_block, area);
 
