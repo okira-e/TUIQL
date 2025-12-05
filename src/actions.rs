@@ -1,5 +1,3 @@
-use crate::drivers::QueryResult;
-
 #[derive(Debug, Clone)]
 pub enum Action {
     App(AppAction),
@@ -14,37 +12,31 @@ pub enum AppAction {
     Quit,
     CyclePane,
     SelectTable(String),
-}
-
-#[derive(Debug, Clone)]
-pub enum QueryAction {
-    Entity(String),
-    Custom(String),
+    Resize(u16, u16),
 }
 
 #[derive(Debug, Clone)]
 pub enum ExplorerAction {
     MoveUp,
     MoveDown,
-    MoveToTop,
-    MoveToBottom,
-    MoveHalfPageUp,
-    MoveHalfPageDown,
-    MoveToNextMatch,
-    MoveToPrevMatch,
-    ClearSearch,
     ExpandNextItemType,
 }
 
 #[derive(Debug, Clone)]
 pub enum ResultsTableAction {
-  SetResults(String, QueryResult, usize, usize),
+    MoveUp,
+    MoveDown,
+    ScrollLeft,
+    ScrollRight,
+    JumpUp,
+    JumpDown,
+    GoToFirst,
+    GoToLast,
 }
 
 #[derive(Debug, Clone)]
 pub enum DbAction {
     QueryTable(String),
-    QueryStatement(String),
     NextPage,
     PrevPage,
 }

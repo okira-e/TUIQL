@@ -43,13 +43,10 @@ pub async fn new_connection(kind: &DbKinds, url: &str) -> Result<Box<dyn DbDrive
 }
 
 
-pub type ColumnsT = Vec<ColumnMetadata>;
-pub type RowsT = Vec<serde_json::Value>;
-
 #[derive(Debug, Default, Clone)]
 pub struct QueryResult {
-    pub columns: ColumnsT,
-    pub rows: RowsT,
+    pub columns: Vec<ColumnMetadata>,
+    pub rows: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone)]

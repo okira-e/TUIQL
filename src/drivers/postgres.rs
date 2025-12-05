@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use color_eyre::{Result, eyre::bail};
+use color_eyre::Result;
 use dashmap::DashMap;
 use futures::TryStreamExt;
 use sqlx::{Postgres, Row, postgres::PgRow};
@@ -393,8 +393,7 @@ impl drivers::DbDriver for PostgresDriver {
             };
         }
         
-        self.pagination_strategy_cache
-            .insert(table_name.to_string(), ret.clone());
+        self.pagination_strategy_cache.insert(table_name.to_string(), ret.clone());
 
         return Ok(ret);
     }

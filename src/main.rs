@@ -1,4 +1,6 @@
 mod app;
+mod draw;
+mod update;
 mod config;
 mod handlers;
 mod actions;
@@ -8,6 +10,8 @@ mod drivers;
 mod ui;
 mod theme;
 mod utils;
+mod results_table;
+mod explorer;
 
 
 use colored::*;
