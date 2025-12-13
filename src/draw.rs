@@ -4,7 +4,7 @@ use ratatui::{
     widgets::Block,
 };
 
-use crate::{app::{App, View}, ui::{explorer_view::ExplorerView, statusline_view::StatusLineView, table_view::TableView}};
+use crate::{app::View, app::App, ui::{explorer_view::ExplorerView, statusline_view::StatusLineView, table_view::TableView}};
 
 impl App {
     pub fn draw(&self, frame: &mut Frame) {
@@ -33,7 +33,7 @@ impl App {
         let (explorer_split, table_split) = (explorer_table_split[0], explorer_table_split[1]);
 
         ExplorerView::draw(
-            &self.explorer_state,
+            &self.explorer_model,
             &self.theme,
             frame,
             explorer_split,
@@ -41,7 +41,7 @@ impl App {
         );
         
         TableView::draw(
-            &self.results_table_state,
+            &self.results_table_model,
             &self.theme,
             frame,
             table_split,
@@ -50,7 +50,7 @@ impl App {
         );
 
         StatusLineView::draw(
-            &self.statusline_state,
+            &self.statusline_model,
             &self.theme,
             frame,
             app_statusline_split[1],

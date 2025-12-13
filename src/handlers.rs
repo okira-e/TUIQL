@@ -4,7 +4,7 @@ use color_eyre::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use futures::{FutureExt, StreamExt};
 
-use crate::{actions::{Action, AppAction, DbAction, ExplorerAction, ResultsTableAction}, app::{App, View}};
+use crate::{actions::{Action, AppAction, DbAction, ExplorerAction, ResultsTableAction}, app::View, app::App};
 
 
 impl App {
@@ -73,6 +73,7 @@ impl App {
                     (_, KeyCode::Char('h') | KeyCode::Left) => {
                         Action::ResultsTable(ResultsTableAction::ScrollLeft)
                     }
+                    // @TODO: Scroll bar appears when it should on storage_tiers but I can't scroll right.
                     (_, KeyCode::Char('l') | KeyCode::Right) => {
                         Action::ResultsTable(ResultsTableAction::ScrollRight)
                     }
@@ -109,7 +110,7 @@ impl App {
                         Action::Explorer(ExplorerAction::ExpandNextItemType)
                     }
                     (_, KeyCode::Enter) => {
-                        if let Some(item) = &self.explorer_state.focused_item {
+                        if let Some(item) = &self.explorer_model.focused_item {
                             Action::App(AppAction::SelectTable(item.name.clone()))
                         } else {
                             Action::None

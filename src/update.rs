@@ -1,4 +1,5 @@
-use crate::app::{App, View};
+use crate::app::View;
+use crate::app::App;
 
 use color_eyre::Result;
 use tracing::debug;
@@ -36,6 +37,7 @@ impl App {
             },
             AppAction::SelectTable(name) => {
                 self.db_driver.reset_query_state();
+                self.results_table_model.reset();
                 _ = self.action_tx.send(Action::Db(DbAction::QueryTable(name)));
             },
             AppAction::Resize(w, h) => {
@@ -50,70 +52,70 @@ impl App {
     fn update_explorer(&mut self, action: ExplorerAction) {
         match action {
             ExplorerAction::MoveUp => {
-                let current_index = self.explorer_state.focused_item.clone().unwrap().index;
+                let current_index = self.explorer_model.focused_item.clone().unwrap().index;
 
                 if current_index > 0 {
-                    self.explorer_state.focused_item = Some(
+                    self.explorer_model.focused_item = Some(
                         ExplorerView::get_items_by_type(
-                            &self.explorer_state.items,
-                            &self.explorer_state.focused_item.clone().unwrap().kind,
+                            &self.explorer_model.items,
+                            &self.explorer_model.focused_item.clone().unwrap().kind,
                         )[current_index - 1]
                             .clone(),
                     );
                 } else {
-                    let prev_item_type = ExplorerView::get_prev_item_type(&self.explorer_state.focused_item.clone().unwrap().kind);
+                    let prev_item_type = ExplorerView::get_prev_item_type(&self.explorer_model.focused_item.clone().unwrap().kind);
                     let prev_items = ExplorerView::get_items_by_type(
-                        &self.explorer_state.items,
+                        &self.explorer_model.items,
                         &prev_item_type,
                     );
 
                     if prev_items.len() > 0 {
-                        self.explorer_state.focused_item = Some(prev_items[prev_items.len() - 1].clone());
+                        self.explorer_model.focused_item = Some(prev_items[prev_items.len() - 1].clone());
                     }
                 }
             }
             ExplorerAction::MoveDown => {
-                let current_index = self.explorer_state.focused_item.clone().unwrap().index;
+                let current_index = self.explorer_model.focused_item.clone().unwrap().index;
 
                 if current_index + 1
                     < ExplorerView::get_items_by_type(
-                        &self.explorer_state.items,
-                        &self.explorer_state.focused_item.clone().unwrap().kind,
+                        &self.explorer_model.items,
+                        &self.explorer_model.focused_item.clone().unwrap().kind,
                     )
                     .len()
                 {
-                    self.explorer_state.focused_item = Some(
+                    self.explorer_model.focused_item = Some(
                         ExplorerView::get_items_by_type(
-                            &self.explorer_state.items,
-                            &self.explorer_state.focused_item.clone().unwrap().kind,
+                            &self.explorer_model.items,
+                            &self.explorer_model.focused_item.clone().unwrap().kind,
                         )[current_index + 1]
                             .clone(),
                     );
                 } else {
                     let next_item_type = ExplorerView::get_next_item_type(
-                        &self.explorer_state.focused_item.clone().unwrap().kind,
+                        &self.explorer_model.focused_item.clone().unwrap().kind,
                     );
 
-                    if ExplorerView::get_items_by_type(&self.explorer_state.items, &next_item_type).len() > 0 {
-                        self.explorer_state.focused_item = Some(
-                            ExplorerView::get_items_by_type(&self.explorer_state.items, &next_item_type)[0].clone(),
+                    if ExplorerView::get_items_by_type(&self.explorer_model.items, &next_item_type).len() > 0 {
+                        self.explorer_model.focused_item = Some(
+                            ExplorerView::get_items_by_type(&self.explorer_model.items, &next_item_type)[0].clone(),
                         );
                     }
                 }
             }
             ExplorerAction::ExpandNextItemType => {
-                let current_type = &self.explorer_state.focused_item.clone().unwrap().kind;
+                let current_type = &self.explorer_model.focused_item.clone().unwrap().kind;
                 let next_type = ExplorerView::get_next_item_type(current_type);
 
-                if ExplorerView::get_items_by_type(&self.explorer_state.items, &next_type).len() > 0 {
-                    self.explorer_state.focused_item = Some(ExplorerView::get_items_by_type(&self.explorer_state.items, &next_type)[0].clone());
+                if ExplorerView::get_items_by_type(&self.explorer_model.items, &next_type).len() > 0 {
+                    self.explorer_model.focused_item = Some(ExplorerView::get_items_by_type(&self.explorer_model.items, &next_type)[0].clone());
                 }
             }
         }
     }
 
     fn update_results_table(&mut self, action: ResultsTableAction) {
-        let mut state = self.results_table_state.ratatui_table_state.borrow_mut();
+        let mut state = self.results_table_model.ratatui_table_state.borrow_mut();
         let current = state.selected().unwrap_or(0);
         let total_rows = self.query_result.rows.len();
 
@@ -135,19 +137,19 @@ impl App {
                 state.select(Some(new_index));
             }
             ResultsTableAction::ScrollLeft => {
-                if self.results_table_state.horizontal_scroll_offset > 0 {
-                    self.results_table_state.horizontal_scroll_offset -= 1;
+                if self.results_table_model.horizontal_scroll_offset > 0 {
+                    self.results_table_model.horizontal_scroll_offset -= 1;
                 }
             }
             ResultsTableAction::ScrollRight => {
-                let horizontal_scroll_offset = self.results_table_state.horizontal_scroll_offset;
+                let horizontal_scroll_offset = self.results_table_model.horizontal_scroll_offset;
 
-                if self.results_table_state.should_draw_scrollbar(
+                if self.results_table_model.should_draw_scrollbar(
                     &self.query_result,
                     self.area.width,
                 ) && horizontal_scroll_offset < self.query_result.columns.len() - 1
                 {
-                    self.results_table_state.horizontal_scroll_offset += 1;
+                    self.results_table_model.horizontal_scroll_offset += 1;
                 }
             }
             ResultsTableAction::JumpUp => {
@@ -183,11 +185,11 @@ impl App {
                 let count = self.db_driver.query_count(&table_name).await?;
                 
                 self.focused_view = View::ResultsTable;
-                self.results_table_state.table_name = table_name.clone();
-                self.results_table_state.results_row_count = self.query_result.rows.len();
-                self.results_table_state.total_row_count = count;
-                self.results_table_state.current_pos = self.db_driver.get_current_page(&table_name).await?;
-                self.results_table_state.ratatui_table_state.borrow_mut().select(Some(0));
+                self.results_table_model.table_name = table_name.clone();
+                self.results_table_model.results_row_count = self.query_result.rows.len();
+                self.results_table_model.total_row_count = count;
+                self.results_table_model.current_pos = self.db_driver.get_current_page(&table_name).await?;
+                self.results_table_model.ratatui_table_state.borrow_mut().select(Some(0));
             },
             DbAction::NextPage => {
                 if let Some(selected_table) = &self.selected_table {
@@ -205,11 +207,11 @@ impl App {
                     
                     self.query_result = results;
                     
-                    self.results_table_state.table_name = selected_table.clone();
-                    self.results_table_state.results_row_count = self.query_result.rows.len();
-                    self.results_table_state.total_row_count = count;
-                    self.results_table_state.current_pos = self.db_driver.get_current_page(&selected_table).await?;
-                    self.results_table_state.ratatui_table_state.borrow_mut().select(Some(0));
+                    self.results_table_model.table_name = selected_table.clone();
+                    self.results_table_model.results_row_count = self.query_result.rows.len();
+                    self.results_table_model.total_row_count = count;
+                    self.results_table_model.current_pos = self.db_driver.get_current_page(&selected_table).await?;
+                    self.results_table_model.ratatui_table_state.borrow_mut().select(Some(0));
                 }
             }
             DbAction::PrevPage => {
@@ -220,11 +222,11 @@ impl App {
                     self.query_result = results;
                     let count = self.db_driver.query_count(selected_table).await?;
 
-                    self.results_table_state.table_name = selected_table.clone();
-                    self.results_table_state.results_row_count = self.query_result.rows.len();
-                    self.results_table_state.total_row_count = count;
-                    self.results_table_state.current_pos = self.db_driver.get_current_page(&selected_table).await?;
-                    self.results_table_state.ratatui_table_state.borrow_mut().select(Some(0));
+                    self.results_table_model.table_name = selected_table.clone();
+                    self.results_table_model.results_row_count = self.query_result.rows.len();
+                    self.results_table_model.total_row_count = count;
+                    self.results_table_model.current_pos = self.db_driver.get_current_page(&selected_table).await?;
+                    self.results_table_model.ratatui_table_state.borrow_mut().select(Some(0));
                 }
             }
         };

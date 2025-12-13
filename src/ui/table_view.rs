@@ -9,14 +9,14 @@ use ratatui::{
 use serde_json::Value;
 
 use crate::drivers::QueryResult;
-use crate::results_table::ResultsTableState;
+use crate::models::results_table_model::ResultsTableModel;
 use crate::{theme::Theme};
 
 pub struct TableView {}
 
 impl TableView {
     pub fn draw(
-        state: &ResultsTableState,
+        state: &ResultsTableModel,
         theme: &Theme,
         frame: &mut Frame,
         area: Rect,

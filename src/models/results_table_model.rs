@@ -4,8 +4,9 @@ use ratatui::{layout::Constraint, widgets::TableState};
 
 use crate::drivers::{ColumnMetadata, QueryResult};
 
+
 #[derive(Debug, Default)]
-pub struct ResultsTableState {
+pub struct ResultsTableModel {
     pub table_name: String,
     pub results_row_count: usize,
     pub total_row_count: usize,
@@ -15,7 +16,11 @@ pub struct ResultsTableState {
     pub ratatui_table_state: RefCell<TableState>,
 }
 
-impl ResultsTableState {
+impl ResultsTableModel {
+    pub fn reset(&mut self) {
+        self.horizontal_scroll_offset = 0;
+    }
+    
     pub fn get_visible_cols(&self, query_result: &QueryResult, width: u16) -> (Vec<ColumnMetadata>, Vec<Constraint>) {
         let mut visible_cols = vec![];
         let mut widths = vec![];

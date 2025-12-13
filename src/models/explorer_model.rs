@@ -1,7 +1,13 @@
-use crate::ui::explorer_view::ExplorerItem;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExplorerItem {
+    pub name: String,
+    pub kind: String,
+    pub index: usize,
+}
+
 
 #[derive(Debug, Default)]
-pub struct ExplorerState {
+pub struct ExplorerModel {
     /// The item under the cursor.
     pub focused_item: Option<ExplorerItem>,
     /// The item the user chose to select.

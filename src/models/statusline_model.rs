@@ -16,15 +16,15 @@ pub enum StatusLineMode {
     Command(StatusLineCommand),
 }
 
-pub struct StatusLineState {
+pub struct StatusLineModel {
     pub mode: StatusLineMode,
 }
 
-impl StatusLineState {
+impl StatusLineModel {
     pub fn new() -> Self {
         return Self {
             mode: StatusLineMode::Status(None)
-            // mode: StatusLineMode::Status(Some(StatusLineMsg { text: "hi there hello".to_string(), kind: StatusLineMsgKind::Neutral })) nocheckin
+            // mode: StatusLineMode::Status(Some(StatusLineMsg { text: "hi there hello".to_string(), kind: StatusLineMsgKind::Neutral }))
         }
     }
 

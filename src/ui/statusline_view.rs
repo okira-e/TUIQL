@@ -1,11 +1,11 @@
 use ratatui::{Frame, layout::Rect, widgets::{Block, Padding, Paragraph}};
 
-use crate::{statusline::{StatusLineMode, StatusLineMsgKind, StatusLineState}, theme::Theme};
+use crate::{ models::statusline_model::{StatusLineMode, StatusLineMsgKind, StatusLineModel}, theme::Theme};
 
 pub struct StatusLineView {}
 
 impl StatusLineView {
-    pub fn draw(state: &StatusLineState, theme: &Theme, frame: &mut Frame, area: Rect) {
+    pub fn draw(state: &StatusLineModel, theme: &Theme, frame: &mut Frame, area: Rect) {
         let padding = Block::default().padding(Padding::left(1));
         match &state.mode {
             StatusLineMode::Status(msg) => {

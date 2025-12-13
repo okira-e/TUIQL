@@ -2,20 +2,13 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect}, style::{Style, Stylize}, text::{Line, Span}, widgets::{Block, Borders, Paragraph}, Frame
 };
 
-use crate::{explorer::ExplorerState, theme::Theme};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExplorerItem {
-    pub name: String,
-    pub kind: String,
-    pub index: usize,
-}
+use crate::{models::explorer_model::{ExplorerItem, ExplorerModel}, theme::Theme};
 
 pub struct ExplorerView {}
 
 impl ExplorerView {
     pub fn draw(
-        state: &ExplorerState,
+        state: &ExplorerModel,
         theme: &Theme,
         frame: &mut Frame,
         area: Rect,

@@ -1,5 +1,13 @@
 use crate::{
-    actions::Action, config::Settings, drivers::{self, DbDriver, QueryResult}, explorer::ExplorerState, results_table::ResultsTableState, statusline::StatusLineState, theme::{Flavor, Theme}, ui::explorer_view::ExplorerItem
+    actions::Action,
+    config::Settings,
+    drivers::{self, DbDriver, QueryResult},
+    models::{
+        explorer_model::{ExplorerItem, ExplorerModel},
+        results_table_model::ResultsTableModel,
+        statusline_model::StatusLineModel,
+    },
+    theme::{Flavor, Theme},
 };
 use color_eyre::Result;
 use crossterm::event::EventStream;
@@ -20,9 +28,9 @@ pub struct App {
     pub action_tx: mpsc::UnboundedSender<Action>,
     pub action_rx: mpsc::UnboundedReceiver<Action>,
     pub focused_view: View,
-    pub results_table_state: ResultsTableState,
-    pub explorer_state: ExplorerState,
-    pub statusline_state: StatusLineState,
+    pub results_table_model: ResultsTableModel,
+    pub explorer_model: ExplorerModel,
+    pub statusline_model: StatusLineModel,
     pub query_result: QueryResult,
     pub settings: Settings,
     pub db_driver: Box<dyn DbDriver>,
@@ -51,9 +59,9 @@ impl App {
             selected_table: None,
             focused_view: View::Explorer,
             query_result: QueryResult::default(),
-            results_table_state: ResultsTableState::default(),
-            explorer_state: ExplorerState::default(),
-            statusline_state: StatusLineState::new(),
+            results_table_model: ResultsTableModel::default(),
+            explorer_model: ExplorerModel::default(),
+            statusline_model: StatusLineModel::new(),
             area: Rect::default(),
         };
     }
@@ -76,9 +84,9 @@ impl App {
         }).collect();
         
         let items: Vec<_> = tables.into_iter().chain(views).collect();
-        self.explorer_state.items = items;
-        self.explorer_state.focused_item = Some(
-            self.explorer_state.items[0].clone()
+        self.explorer_model.items = items;
+        self.explorer_model.focused_item = Some(
+            self.explorer_model.items[0].clone()
         );
 
         return Ok(());

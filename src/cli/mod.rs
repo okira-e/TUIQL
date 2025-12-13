@@ -6,7 +6,7 @@ use color_eyre::{eyre::bail, Result};
 use tabled::{Table, Tabled};
 use url::Url;
 
-use crate::{app, cli::commands::Commands, drivers, config};
+use crate::{app::App, cli::commands::Commands, config, drivers };
 
 
 pub async fn run(args: args::AppArgs) -> Result<()> {
@@ -51,7 +51,7 @@ async fn connect_directly(args: args::ConnectCmdArgs) -> Result<()> {
 
     let settings = config::load_settings()?;
     
-    let mut app = app::App::new(
+    let mut app = App::new(
         settings,
         db_driver,
     ).await;
@@ -81,7 +81,7 @@ async fn open_connection(connection_name: &str) -> Result<()> {
     let db_driver = drivers::new_connection(&connection.kind, &connection.url).await?;
 
     let settings = config::load_settings()?;
-    let mut app = app::App::new(
+    let mut app = App::new(
         settings,
         db_driver,
     ).await;
