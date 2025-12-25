@@ -9,7 +9,7 @@ pub struct TableModel {
     pub table_name: String,
     pub query_result: QueryResult,
     pub results_row_count: usize,
-    pub total_row_count: usize,
+    pub total_row_count: Option<usize>,
     pub current_pos: usize,
     pub selected_row: Option<usize>,
     /// Dictates how many columns to skip horizontally

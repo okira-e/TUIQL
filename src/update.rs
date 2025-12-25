@@ -243,28 +243,25 @@ impl App {
     async fn update_db(&mut self, action: DbAction) -> Result<()> {
         match action {
             DbAction::QueryTable(table_name) => {
+                let results = self.db_driver.query(&table_name).await?;
+                
                 self.selected_table = Some(table_name.clone());
 
-                let results = self.db_driver.query(&table_name).await?;
+                let rows_fetched = results.rows.len();
                 self.table_model.query_result = results;
 
-                let count = self.db_driver.query_count(&table_name).await?;
-                
                 self.focused_view = View::ResultsTable;
                 self.table_model.table_name = table_name.clone();
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                self.table_model.total_row_count = count;
                 self.table_model.current_pos = self.db_driver.get_current_page(&table_name).await?;
                 self.table_model.selected_row = Some(0);
+                
+                let msg = format!("Fetched {} rows", rows_fetched);
+                self.report_message(msg, MsgKind::Neutral, MsgLifetime::Short);
             },
             DbAction::NextPage => {
                 if let Some(selected_table) = &self.selected_table {
-                    let count = self.db_driver.query_count(selected_table).await?;
-
-                    self.db_driver.next_page(
-                        &selected_table,
-                        count,
-                    ).await?;
+                    self.db_driver.next_page(&selected_table).await?;
                     
                     let results = self.db_driver.query(selected_table).await?;
                     if results.rows.len() == 0 {
@@ -275,7 +272,6 @@ impl App {
                     
                     self.table_model.table_name = selected_table.clone();
                     self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                    self.table_model.total_row_count = count;
                     self.table_model.current_pos = self.db_driver.get_current_page(&selected_table).await?;
                     self.table_model.reset(Some(0));
                 }
@@ -286,11 +282,9 @@ impl App {
 
                     let results = self.db_driver.query(&selected_table).await?;
                     self.table_model.query_result = results;
-                    let count = self.db_driver.query_count(selected_table).await?;
 
                     self.table_model.table_name = selected_table.clone();
                     self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                    self.table_model.total_row_count = count;
                     self.table_model.current_pos = self.db_driver.get_current_page(&selected_table).await?;
                     self.table_model.reset(Some(0));
                 }

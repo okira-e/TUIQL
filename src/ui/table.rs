@@ -25,8 +25,8 @@ pub fn render_table(
     };
 
     let row_status = format!(
-        "{}-{}/{}",
-        model.current_pos, model.total_row_count, model.results_row_count,
+        "{}/{}",
+        model.current_pos, model.results_row_count,
     );
 
     let container_block = Block::default()

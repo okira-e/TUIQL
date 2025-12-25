@@ -18,7 +18,7 @@ pub trait DbDriver: Send + Sync {
     async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>>;
     async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>>;
     async fn get_pagination_strategy(&self, table_name: &str) -> Result<PaginationStrategy>;
-    async fn next_page(&mut self, table_name: &str, total_row_count: usize) -> Result<()>;
+    async fn next_page(&mut self, table_name: &str) -> Result<()>;
     async fn prev_page(&mut self, table_name: &str) -> Result<()>;
     fn reset_query_state(&mut self);
     async fn get_current_page(&self, table_name: &str) -> Result<usize>;

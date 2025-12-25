@@ -20,14 +20,6 @@ impl App {
             self.focused_view == View::Explorer,
         );
 
-        render_table(
-            &self.table_model,
-            &self.theme,
-            frame,
-            self.widgets_chunks.table_chunk,
-            self.focused_view == View::ResultsTable,
-        );
-
         render_statusline(
             &self.statusline_model,
             &self.theme,
@@ -41,6 +33,14 @@ impl App {
                 &self.theme,
                 frame,
                 self.widgets_chunks.json_view_chunk,
+            );
+        } else {
+            render_table(
+                &self.table_model,
+                &self.theme,
+                frame,
+                self.widgets_chunks.table_chunk,
+                self.focused_view == View::ResultsTable,
             );
         }
     }

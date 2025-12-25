@@ -400,16 +400,14 @@ impl drivers::DbDriver for PostgresDriver {
 
     /// Modifies the state so the next fetch returns the next page.
     /// Returns if the state is new and fetching will yield newer results.
-    async fn next_page(&mut self, table: &str, total: usize) -> Result<()> {
+    async fn next_page(&mut self, table: &str) -> Result<()> {
         match self.get_pagination_strategy(table).await? {
             PaginationStrategy::Cursor(_) => {
                 // nothing — cursor advanced when fetching
             }
             PaginationStrategy::Offset => {
                 let new_offset = self.query_state.offset + self.query_state.limit;
-                if new_offset < total {
-                    self.query_state.offset = new_offset;
-                }
+                self.query_state.offset = new_offset;
             }
         }
 
