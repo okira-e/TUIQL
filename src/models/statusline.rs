@@ -37,7 +37,7 @@ impl MsgLifetime {
             MsgLifetime::Short => std::time::Duration::from_secs(3),
             MsgLifetime::Long => std::time::Duration::from_secs(8),
         }
-    } 
+    }
 }
 
 #[derive(Clone)]

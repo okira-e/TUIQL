@@ -1,10 +1,9 @@
-use std::path::PathBuf;
-use color_eyre::{eyre::bail, Result};
+use color_eyre::{Result, eyre::bail};
 use serde::Deserialize;
 use serde_json::Value;
+use std::path::PathBuf;
 
 use crate::drivers::kinds::DbKinds;
-
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {}
@@ -15,7 +14,6 @@ pub struct Connection {
     pub kind: DbKinds,
     pub url: String,
 }
-
 
 /// Loads the user settings stored in the config file.
 pub fn load_settings() -> Result<Settings> {
@@ -51,7 +49,7 @@ pub fn load_connections() -> Result<Vec<Connection>> {
         Ok(val) => val,
         Err(err) => bail!("Failed to open connection file: {}", err),
     };
-    
+
     let connections: Vec<Connection> = match serde_json::from_reader(connections_file) {
         Ok(val) => val,
         Err(err) => bail!("Failed to parse connection file: {}", err),
@@ -126,7 +124,8 @@ pub fn create_config_if_not_exists() -> Result<()> {
         let connections_file_path = config_dir.join("connections.json");
         if !connections_file_path.exists() {
             let connections_config_file = std::fs::File::create(&connections_file_path)?;
-            const DEFAULT_CONNECTIONS_CONFIG: &str = include_str!("../assets/config/default_connections_config.json");
+            const DEFAULT_CONNECTIONS_CONFIG: &str =
+                include_str!("../assets/config/default_connections_config.json");
             let default_config: Value = serde_json::from_str(DEFAULT_CONNECTIONS_CONFIG)?;
             serde_json::to_writer(connections_config_file, &default_config)?;
         }
@@ -135,7 +134,8 @@ pub fn create_config_if_not_exists() -> Result<()> {
         let settings_file_path = config_dir.join("settings.json");
         if !settings_file_path.exists() {
             let settings_config_file = std::fs::File::create(&settings_file_path)?;
-            const DEFAULT_SETTINGS_CONFIG: &str = include_str!("../assets/config/default_settings_config.json");
+            const DEFAULT_SETTINGS_CONFIG: &str =
+                include_str!("../assets/config/default_settings_config.json");
             let default_config: Value = serde_json::from_str(DEFAULT_SETTINGS_CONFIG)?;
             serde_json::to_writer(settings_config_file, &default_config)?;
         }

@@ -2,7 +2,6 @@ use clap::Subcommand;
 
 use crate::cli::args::{ConnectCmdArgs, OpenCmdArgs};
 
-
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Connect to a database directly without saving it.

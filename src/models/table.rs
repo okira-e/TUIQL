@@ -3,7 +3,6 @@ use serde_json::Value;
 
 use crate::drivers::{ColumnMetadata, QueryResult};
 
-
 #[derive(Debug, Default)]
 pub struct TableModel {
     pub table_name: String,
@@ -24,12 +23,13 @@ impl TableModel {
         self.vertical_scroll_offset = 0;
         self.selected_row = selected_row;
     }
-    
+
     pub fn get_visible_cols(&self, width: u16) -> (Vec<ColumnMetadata>, Vec<Constraint>) {
         let mut visible_cols = vec![];
         let mut widths = vec![];
         let mut width_so_far = 0;
-        for col in self.query_result
+        for col in self
+            .query_result
             .columns
             .iter()
             .skip(self.horizontal_scroll_offset)
@@ -41,7 +41,7 @@ impl TableModel {
             } else {
                 30
             };
-    
+
             if width_so_far + w < width {
                 width_so_far += w;
                 widths.push(Constraint::Max(w));
@@ -50,26 +50,25 @@ impl TableModel {
                 break;
             }
         }
-        
+
         return (visible_cols, widths);
     }
-    
+
     pub fn should_draw_scrollbar(&self, width: u16) -> bool {
-        let (visible_cols, _) = self.get_visible_cols(width); 
+        let (visible_cols, _) = self.get_visible_cols(width);
         return visible_cols.len() < self.query_result.columns.len();
     }
-    
+
     pub fn get_selected_row_data(&self) -> Option<Value> {
         if self.query_result.rows.is_empty() {
             return None;
         }
-        
+
         match self.selected_row {
             None => return None,
             Some(pos) => {
                 return Some(self.query_result.rows[pos].clone());
-            },
+            }
         }
-
     }
 }

@@ -9,7 +9,7 @@ use ratatui::{
 use serde_json::Value;
 
 use crate::models::table::TableModel;
-use crate::{theme::Theme};
+use crate::theme::Theme;
 
 pub fn render_table(
     model: &TableModel,
@@ -24,26 +24,19 @@ pub fn render_table(
         Style::default().bg(theme.bg)
     };
 
-    let row_status = format!(
-        "{}/{}",
-        model.current_pos, model.results_row_count,
-    );
+    let row_status = format!("{}/{}", model.current_pos, model.results_row_count,);
 
     let container_block = Block::default()
         .title("Query Result".to_string())
         .title(
-            Line::from(
-                model.table_name.clone()
-            )
-            .style(theme.fg)
-            .alignment(Alignment::Right)
+            Line::from(model.table_name.clone())
+                .style(theme.fg)
+                .alignment(Alignment::Right),
         )
         .title_bottom(
-            Line::from(
-                row_status.clone()
-            )
-            .style(theme.fg)
-            .alignment(Alignment::Center)
+            Line::from(row_status.clone())
+                .style(theme.fg)
+                .alignment(Alignment::Center),
         )
         .border_style(container_border_style)
         .borders(Borders::ALL);
@@ -132,17 +125,14 @@ pub fn render_table(
     //
 
     if model.should_draw_scrollbar(area.width) {
-        let scrollbar_width = (
-            1.0 / (model.query_result.columns.len() as f32 / 1 as f32)
-        ) * area.width as f32;
+        let scrollbar_width =
+            (1.0 / (model.query_result.columns.len() as f32 / 1 as f32)) * area.width as f32;
 
         let offset_width = (1.0 / model.query_result.columns.len() as f32) * area.width as f32;
         let scrollbar_offset =
             String::from(" ").repeat(offset_width as usize * model.horizontal_scroll_offset);
 
-        let scrollbar = String::from("▃").repeat(
-            scrollbar_width.round() as usize,
-        );
+        let scrollbar = String::from("▃").repeat(scrollbar_width.round() as usize);
 
         frame.render_widget(
             Span::from(scrollbar_offset + &scrollbar).style(theme.fg),

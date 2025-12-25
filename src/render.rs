@@ -2,7 +2,10 @@ use ratatui::{Frame, style::Style, widgets::Block};
 
 use crate::{
     app::{App, View},
-    ui::{explorer::render_explorer, json_view::render_json_view, statusline::render_statusline, table::render_table},
+    ui::{
+        explorer::render_explorer, json_view::render_json_view, statusline::render_statusline,
+        table::render_table,
+    },
 };
 
 impl App {

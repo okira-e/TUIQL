@@ -5,7 +5,6 @@ pub struct ExplorerItem {
     pub index: usize,
 }
 
-
 #[derive(Debug, Default)]
 pub struct ExplorerModel {
     /// The item under the cursor.

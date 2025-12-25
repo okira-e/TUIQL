@@ -2,7 +2,6 @@ use clap::{Args, Parser};
 
 use crate::{cli, drivers};
 
-
 #[derive(Debug, Parser)]
 #[command(version)]
 pub struct AppArgs {

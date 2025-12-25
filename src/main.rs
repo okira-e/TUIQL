@@ -1,22 +1,20 @@
+mod actions;
 mod app;
+mod cli;
+mod config;
+mod drivers;
+mod handlers;
+mod logging;
 mod models;
 mod render;
-mod update;
-mod config;
-mod handlers;
-mod actions;
-mod cli;
-mod logging;
-mod drivers;
-mod ui;
 mod theme;
+mod ui;
+mod update;
 mod utils;
 
-
-use colored::*;
-use color_eyre::Result;
 use clap::Parser;
-
+use color_eyre::Result;
+use colored::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,7 +24,7 @@ async fn main() -> Result<()> {
         eprintln!("Error creating config files: {}", err);
         std::process::exit(1);
     }
-    
+
     // Set up logging
     // Should live for the lifetime of the application.
     let _guard = logging::setup_logging()?;
@@ -39,4 +37,3 @@ async fn main() -> Result<()> {
 
     return Ok(());
 }
-

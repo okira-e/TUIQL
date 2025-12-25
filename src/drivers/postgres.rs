@@ -99,7 +99,7 @@ impl drivers::DbDriver for PostgresDriver {
 
     async fn query(&mut self, table_name: &str) -> Result<QueryResult> {
         self.query_state.order_by = self.get_order_by_clause(table_name).await?;
-        
+
         let limit = if self.query_state.limit > 0 {
             self.query_state.limit
         } else {
@@ -246,7 +246,7 @@ impl drivers::DbDriver for PostgresDriver {
 
         Ok(count_usize)
     }
-    
+
     async fn get_order_by_clause(&mut self, table_name: &str) -> Result<String> {
         // Sort by the primary key(s) by default. If no order by was specified
         // by the user.
@@ -258,7 +258,7 @@ impl drivers::DbDriver for PostgresDriver {
                 return Ok(format!(" ORDER BY {}", pk_cols.join(", ")));
             }
         }
-        
+
         return Ok(self.query_state.order_by.clone());
     }
 
@@ -267,7 +267,7 @@ impl drivers::DbDriver for PostgresDriver {
         if let Some(cols) = self.pk_columns_cache.get(table_name) {
             return Ok(cols.clone());
         }
-        
+
         let sql = r#"
             SELECT att.attname AS column_name
             FROM pg_constraint con
@@ -292,7 +292,7 @@ impl drivers::DbDriver for PostgresDriver {
         //
         // Sort the primary columns so that integer/serial types are first for ordering.
         //
-        
+
         let all_columns = self.get_columns(table_name).await?;
         pk_cols.sort_by_key(|col| {
             let t = all_columns
@@ -300,17 +300,17 @@ impl drivers::DbDriver for PostgresDriver {
                 .find(|c| c.name == *col)
                 .map(|c| c.data_type.as_str())
                 .unwrap_or("");
-            
+
             // 0 for integer types, 1 for everything else
             match t {
-                "integer" | "bigint" | "smallint" |
-                "serial"  | "bigserial" => 0,
+                "integer" | "bigint" | "smallint" | "serial" | "bigserial" => 0,
                 _ => 1,
             }
         });
-        
-        self.pk_columns_cache.insert(table_name.to_string(), pk_cols.clone());
-        
+
+        self.pk_columns_cache
+            .insert(table_name.to_string(), pk_cols.clone());
+
         return Ok(pk_cols);
     }
 
@@ -319,7 +319,7 @@ impl drivers::DbDriver for PostgresDriver {
         if let Some(cols) = self.table_columns_cache.get(table_name) {
             return Ok(cols.clone());
         }
-        
+
         let sql = r#"
             SELECT
                 column_name,
@@ -344,8 +344,9 @@ impl drivers::DbDriver for PostgresDriver {
             .fetch_all(&self.pool)
             .await?;
 
-        self.table_columns_cache.insert(table_name.to_string(), columns.clone());
-        
+        self.table_columns_cache
+            .insert(table_name.to_string(), columns.clone());
+
         Ok(columns)
     }
 
@@ -359,11 +360,11 @@ impl drivers::DbDriver for PostgresDriver {
         if let Some(strat) = self.pagination_strategy_cache.get(table_name) {
             return Ok(strat.clone());
         }
-        
+
         let mut ret = PaginationStrategy::Offset;
 
         let pk_columns = self.get_pk_columns(table_name).await?;
-        // If a table has a more than one primary key (composite,) no single column 
+        // If a table has a more than one primary key (composite,) no single column
         // is guaranteed to be unique on its own. Therefore, pagination remains offset.
         if pk_columns.len() == 1 {
             let sql = r#"
@@ -379,21 +380,22 @@ impl drivers::DbDriver for PostgresDriver {
                   AND c.column_default LIKE 'nextval(%' -- SERIAL type
                   AND a.attname = c.column_name
             "#;
-    
+
             let columns: Vec<String> = sqlx::query(sql)
                 .bind(table_name)
                 .map(|row: PgRow| row.get("column_name"))
                 .fetch_all(&self.pool)
                 .await?;
-    
+
             ret = if !columns.is_empty() {
                 PaginationStrategy::Cursor(columns[0].clone())
             } else {
                 PaginationStrategy::Offset
             };
         }
-        
-        self.pagination_strategy_cache.insert(table_name.to_string(), ret.clone());
+
+        self.pagination_strategy_cache
+            .insert(table_name.to_string(), ret.clone());
 
         return Ok(ret);
     }
