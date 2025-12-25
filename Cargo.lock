@@ -2413,6 +2413,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "throbber-widgets-tui"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d36b5738d666a2b4c91b7c24998a8588db724b3107258343ebf8824bf55b06d"
+dependencies = [
+ "rand",
+ "ratatui",
+]
+
+[[package]]
 name = "tiff"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2624,6 +2634,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tabled",
+ "throbber-widgets-tui",
  "tokio",
  "tracing",
  "tracing-appender",

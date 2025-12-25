@@ -1,3 +1,5 @@
+use crate::drivers::QueryResult;
+
 #[derive(Debug, Clone)]
 pub enum Action {
     App(AppAction),
@@ -42,8 +44,11 @@ pub enum ResultsTableAction {
 #[derive(Debug, Clone)]
 pub enum DbAction {
     QueryTable(String),
+    QueryTableComplete(String, QueryResult, usize),
     NextPage,
+    NextPageComplete(String, QueryResult, usize),
     PrevPage,
+    PrevPageComplete(String, QueryResult, usize),
 }
 
 #[derive(Debug, Clone)]

@@ -37,6 +37,9 @@ impl App {
                 self.quit();
             }
             AppAction::Tick => {
+                // Increment tick count for spinner animation
+                self.statusline_model.spinner_animation_tick_count = self.statusline_model.spinner_animation_tick_count.wrapping_add(1);
+                
                 // Check if message has expired
                 if self.statusline_model.msg.created_at.elapsed() 
                     > self.statusline_model.msg.lifetime.to_duration() 
@@ -52,7 +55,7 @@ impl App {
                 }
             }
             AppAction::SelectTable(name) => {
-                self.db_driver.reset_query_state();
+                self.db_driver.lock().await.reset_query_state();
                 self.table_model.reset(Some(0));
                 _ = self.action_tx.send(Action::Db(DbAction::QueryTable(name)));
             }
@@ -243,8 +246,27 @@ impl App {
     async fn update_db(&mut self, action: DbAction) -> Result<()> {
         match action {
             DbAction::QueryTable(table_name) => {
-                let results = self.db_driver.query(&table_name).await?;
+                self.statusline_model.is_loading = true;
                 
+                // Spawn background task to query
+                let driver = self.db_driver.clone();
+                let tx = self.action_tx.clone();
+                let table_name_clone = table_name.clone();
+                
+                tokio::spawn(async move {
+                    let mut driver = driver.lock().await;
+                    if let Ok(results) = driver.query(&table_name_clone).await {
+                        if let Ok(current_page) = driver.get_current_page(&table_name_clone).await {
+                            let _ = tx.send(Action::Db(DbAction::QueryTableComplete(
+                                table_name_clone,
+                                results,
+                                current_page,
+                            )));
+                        }
+                    }
+                });
+            },
+            DbAction::QueryTableComplete(table_name, results, current_page) => {
                 self.selected_table = Some(table_name.clone());
 
                 let rows_fetched = results.rows.len();
@@ -253,41 +275,81 @@ impl App {
                 self.focused_view = View::ResultsTable;
                 self.table_model.table_name = table_name.clone();
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                self.table_model.current_pos = self.db_driver.get_current_page(&table_name).await?;
+                self.table_model.current_pos = current_page;
                 self.table_model.selected_row = Some(0);
                 
                 let msg = format!("Fetched {} rows", rows_fetched);
                 self.report_message(msg, MsgKind::Neutral, MsgLifetime::Short);
+                
+                self.statusline_model.is_loading = false;
             },
             DbAction::NextPage => {
                 if let Some(selected_table) = &self.selected_table {
-                    self.db_driver.next_page(&selected_table).await?;
+                    self.statusline_model.is_loading = true;
                     
-                    let results = self.db_driver.query(selected_table).await?;
-                    if results.rows.len() == 0 {
-                        return Ok(());
-                    }
+                    let driver = self.db_driver.clone();
+                    let tx = self.action_tx.clone();
+                    let table_name = selected_table.clone();
                     
-                    self.table_model.query_result = results;
-                    
-                    self.table_model.table_name = selected_table.clone();
-                    self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                    self.table_model.current_pos = self.db_driver.get_current_page(&selected_table).await?;
-                    self.table_model.reset(Some(0));
+                    tokio::spawn(async move {
+                        let mut driver = driver.lock().await;
+                        if driver.next_page(&table_name).await.is_ok() {
+                            if let Ok(results) = driver.query(&table_name).await {
+                                if results.rows.len() > 0 {
+                                    if let Ok(current_page) = driver.get_current_page(&table_name).await {
+                                        let _ = tx.send(Action::Db(DbAction::NextPageComplete(
+                                            table_name,
+                                            results,
+                                            current_page,
+                                        )));
+                                    }
+                                }
+                            }
+                        }
+                    });
                 }
+            }
+            DbAction::NextPageComplete(table_name, results, current_page) => {
+                self.table_model.query_result = results;
+                self.table_model.table_name = table_name;
+                self.table_model.results_row_count = self.table_model.query_result.rows.len();
+                self.table_model.current_pos = current_page;
+                self.table_model.reset(Some(0));
+                
+                self.statusline_model.is_loading = false;
             }
             DbAction::PrevPage => {
                 if let Some(selected_table) = &self.selected_table {
-                    self.db_driver.prev_page(&selected_table).await?;
-
-                    let results = self.db_driver.query(&selected_table).await?;
-                    self.table_model.query_result = results;
-
-                    self.table_model.table_name = selected_table.clone();
-                    self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                    self.table_model.current_pos = self.db_driver.get_current_page(&selected_table).await?;
-                    self.table_model.reset(Some(0));
+                    self.statusline_model.is_loading = true;
+                    
+                    let driver = self.db_driver.clone();
+                    let tx = self.action_tx.clone();
+                    let table_name = selected_table.clone();
+                    
+                    tokio::spawn(async move {
+                        let mut driver = driver.lock().await;
+                        if driver.prev_page(&table_name).await.is_ok() {
+                            if let Ok(results) = driver.query(&table_name).await {
+                                if let Ok(current_page) = driver.get_current_page(&table_name).await {
+                                    let _ = tx.send(Action::Db(DbAction::PrevPageComplete(
+                                        table_name,
+                                        results,
+                                        current_page,
+                                    )));
+                                }
+                            }
+                        }
+                    });
                 }
+            }
+            DbAction::PrevPageComplete(table_name, results, current_page) => {
+                self.table_model.query_result = results;
+                self.table_model.table_name = table_name;
+                self.table_model.results_row_count = self.table_model.query_result.rows.len();
+                self.table_model.current_pos = current_page;
+                self.table_model.reset(Some(0));
+                
+                self.statusline_model.is_loading = false;
             }
         };
 

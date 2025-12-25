@@ -1,6 +1,8 @@
 pub struct StatusLineModel {
     pub mode: StatusLineMode,
     pub msg: StatusLineMsg,
+    pub is_loading: bool,
+    pub spinner_animation_tick_count: usize,
 }
 
 impl StatusLineModel {
@@ -8,6 +10,8 @@ impl StatusLineModel {
         return Self {
             mode: StatusLineMode::Status,
             msg: StatusLineMsg::default(),
+            is_loading: false,
+            spinner_animation_tick_count: 0,
         };
     }
 }

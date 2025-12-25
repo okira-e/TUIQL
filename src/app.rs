@@ -10,7 +10,8 @@ use crate::{
 use color_eyre::Result;
 use crossterm::event::EventStream;
 use ratatui::{DefaultTerminal, layout::{Constraint, Direction, Layout, Rect}};
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
 
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -41,7 +42,7 @@ pub struct App {
     pub statusline_model: StatusLineModel,
     pub json_view_model: JsonViewModel,
     pub settings: Settings,
-    pub db_driver: Box<dyn DbDriver>,
+    pub db_driver: Arc<Mutex<Box<dyn DbDriver>>>,
     pub theme: Theme,
     pub selected_table: Option<String>,
     pub area: Rect,
@@ -62,7 +63,7 @@ impl App {
             event_stream: EventStream::new(),
             action_tx,
             action_rx,
-            db_driver,
+            db_driver: Arc::new(Mutex::new(db_driver)),
             theme,
             selected_table: None,
             focused_view: View::Explorer,
@@ -77,8 +78,10 @@ impl App {
 
     pub async fn init(&mut self) -> Result<()> {
         // Populate the explorer state.
-        let tables: Vec<String> = self.db_driver.get_tables().await?;
-        let views: Vec<String> = self.db_driver.get_views().await?;
+        let driver = self.db_driver.lock().await;
+        let tables: Vec<String> = driver.get_tables().await?;
+        let views: Vec<String> = driver.get_views().await?;
+        drop(driver);
 
         let tables: Vec<ExplorerItem> = tables.iter().enumerate().map(|(i, name)| ExplorerItem {
             name: name.clone(),
