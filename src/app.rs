@@ -1,17 +1,15 @@
 use crate::{
     actions::Action,
     config::Settings,
-    drivers::{self, DbDriver, QueryResult},
+    drivers::{self, DbDriver},
     models::{
-        explorer_model::{ExplorerItem, ExplorerModel},
-        results_table_model::ResultsTableModel,
-        statusline_model::StatusLineModel,
+        explorer::{ExplorerItem, ExplorerModel}, json_view::JsonViewModel, statusline::{MsgLifetime, StatusLineMode, StatusLineModel, StatusLineMsg, MsgKind}, table::TableModel
     },
     theme::{Flavor, Theme},
 };
 use color_eyre::Result;
 use crossterm::event::EventStream;
-use ratatui::{DefaultTerminal, layout::Rect};
+use ratatui::{DefaultTerminal, layout::{Constraint, Direction, Layout, Rect}};
 use tokio::sync::mpsc;
 
 
@@ -20,6 +18,15 @@ pub enum View {
     Explorer,
     ResultsTable,
     StatusLine,
+    JsonView,
+}
+
+#[derive(Default)]
+pub struct WidgetsChunks {
+    pub explorer_chunk: Rect,
+    pub table_chunk: Rect,
+    pub json_view_chunk: Rect,
+    pub statusline_chunk: Rect,
 }
 
 pub struct App {
@@ -28,10 +35,11 @@ pub struct App {
     pub action_tx: mpsc::UnboundedSender<Action>,
     pub action_rx: mpsc::UnboundedReceiver<Action>,
     pub focused_view: View,
-    pub results_table_model: ResultsTableModel,
+    pub widgets_chunks: WidgetsChunks,
+    pub table_model: TableModel,
     pub explorer_model: ExplorerModel,
     pub statusline_model: StatusLineModel,
-    pub query_result: QueryResult,
+    pub json_view_model: JsonViewModel,
     pub settings: Settings,
     pub db_driver: Box<dyn DbDriver>,
     pub theme: Theme,
@@ -58,10 +66,11 @@ impl App {
             theme,
             selected_table: None,
             focused_view: View::Explorer,
-            query_result: QueryResult::default(),
-            results_table_model: ResultsTableModel::default(),
+            widgets_chunks: WidgetsChunks::default(),
+            table_model: TableModel::default(),
             explorer_model: ExplorerModel::default(),
             statusline_model: StatusLineModel::new(),
+            json_view_model: JsonViewModel::default(),
             area: Rect::default(),
         };
     }
@@ -96,10 +105,11 @@ impl App {
         self.running = true;
         let size = terminal.size()?;
         self.area = Rect::new(0, 0, size.width, size.height);
+        self.calculate_widgets_chunks();
 
         while self.running {
             terminal.draw(|frame| {
-                self.draw(frame);
+                self.render(frame);
             })?;
 
             self.handle_events().await?;
@@ -110,5 +120,40 @@ impl App {
     
     pub fn quit(&mut self) {
         self.running = false;
+    }
+    
+    pub fn calculate_widgets_chunks(&mut self) {
+        let app_statusline_split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(1),
+                Constraint::Max(1)
+            ])
+            .split(self.area);
+        
+        let explorer_table_split = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(25),
+                Constraint::Min(1)
+            ])
+            .split(app_statusline_split[0]);
+
+        let (explorer_split, table_split) = (explorer_table_split[0], explorer_table_split[1]);
+
+        self.widgets_chunks.explorer_chunk = explorer_split;
+        self.widgets_chunks.table_chunk = table_split;
+        self.widgets_chunks.json_view_chunk = table_split;
+        self.widgets_chunks.statusline_chunk = app_statusline_split[1];
+    }
+    
+    pub fn report_message(&mut self, text: impl Into<String>, kind: MsgKind, lifetime: MsgLifetime) {
+        self.statusline_model.mode = StatusLineMode::Status;
+        self.statusline_model.msg = StatusLineMsg {
+            text: text.into(),
+            kind,
+            lifetime,
+            created_at: std::time::Instant::now(),
+        };
     }
 }

@@ -4,15 +4,19 @@ pub enum Action {
     Explorer(ExplorerAction),
     ResultsTable(ResultsTableAction),
     Db(DbAction),
+    JsonView(JsonViewAction),
     None,
 }
 
 #[derive(Debug, Clone)]
 pub enum AppAction {
     Quit,
+    Tick,
     CyclePane,
     SelectTable(String),
     Resize(u16, u16),
+    ViewSelectedRowAsJson,
+    ClosePopup,
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +36,7 @@ pub enum ResultsTableAction {
     JumpDown,
     GoToFirst,
     GoToLast,
+    YankSelection,
 }
 
 #[derive(Debug, Clone)]
@@ -39,4 +44,11 @@ pub enum DbAction {
     QueryTable(String),
     NextPage,
     PrevPage,
+}
+
+#[derive(Debug, Clone)]
+pub enum JsonViewAction {
+    MoveUp,
+    MoveDown,
+    GoToFirst,
 }

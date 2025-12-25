@@ -1,14 +1,14 @@
-use ratatui::style::{Color, Style};
+use ratatui::style::Color;
 
 #[derive(Clone)]
 pub struct Theme {
-    pub bg: Style,
-    pub fg: Style,
-    pub accent: Style,
-    pub selection: Style,
-    pub error: Style,
-    pub success: Style,
-    pub pane_focus: Style,
+    pub bg: Color,
+    pub fg: Color,
+    pub accent: Color,
+    pub selection: Color,
+    pub error: Color,
+    pub success: Color,
+    pub pane_focus: Color,
 }
 
 impl Theme {
@@ -19,13 +19,13 @@ impl Theme {
         };
 
         Self {
-            bg: Style::new().bg(p.base),
-            fg: Style::new().fg(p.text),
-            accent:     Style::new().fg(p.flamingo),
-            selection:  Style::new().fg(p.green),
-            error:      Style::new().fg(p.red),
-            success:    Style::new().fg(p.green),
-            pane_focus: Style::new().fg(p.blue),
+            bg: p.base,
+            fg: p.text,
+            accent: p.flamingo,
+            selection: p.green,
+            error: p.red,
+            success: p.green,
+            pane_focus: p.blue,
         }
     }
 }

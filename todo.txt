@@ -1,0 +1,5 @@
+- Make 0 and $ go to first and last char in row
+- Add export command
+- Put numbers on lines in the table
+- Add searching the text already rendered in the table
+- Redesign the explorer widget

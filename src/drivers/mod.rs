@@ -3,12 +3,10 @@ pub mod kinds;
 pub mod postgres;
 // pub mod sqlite;
 
-
 use async_trait::async_trait;
 use color_eyre::Result;
 
 use crate::drivers::{kinds::DbKinds, postgres::PostgresDriver};
-
 
 #[async_trait]
 pub trait DbDriver: Send + Sync {
@@ -32,16 +30,13 @@ pub async fn new_connection(kind: &DbKinds, url: &str) -> Result<Box<dyn DbDrive
             // Ok(Arc::new(MySqlDriver::new_pool(url).await?))
             todo!()
         }
-        DbKinds::Postgres => {
-            Ok(Box::new(PostgresDriver::new_pool(url).await?))
-        }
+        DbKinds::Postgres => Ok(Box::new(PostgresDriver::new_pool(url).await?)),
         DbKinds::SQLite => {
             // Ok(Arc::new(SqliteDriver::new_pool(url).await?))
             todo!()
         }
     };
 }
-
 
 #[derive(Debug, Default, Clone)]
 pub struct QueryResult {

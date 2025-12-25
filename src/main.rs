@@ -1,6 +1,6 @@
 mod app;
 mod models;
-mod draw;
+mod render;
 mod update;
 mod config;
 mod handlers;
