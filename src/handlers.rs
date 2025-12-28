@@ -20,7 +20,7 @@ impl App {
                         if key.kind == KeyEventKind::Press => self.handle_key_event(key),
                         Event::Mouse(_) => {}
                         Event::Resize(w, h) => {
-                            let _ = self.action_tx.send(Action::App(AppAction::Resize(w, h)));
+                            self.update(Action::App(AppAction::Resize(w, h))).await?;
                         }
                         _ => {}
                     }

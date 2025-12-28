@@ -59,6 +59,7 @@ impl App {
             AppAction::SelectTable(name) => {
                 self.db_driver.lock().await.reset_query_state();
                 self.table_model.reset(Some(0));
+                self.close_popup();
                 _ = self.action_tx.send(Action::Db(DbAction::QueryTable(name)));
             }
             AppAction::Resize(w, h) => {
@@ -73,8 +74,7 @@ impl App {
             }
             AppAction::ClosePopup => match self.focused_view {
                 View::JsonView => {
-                    self.json_view_model.data = None;
-                    self.focused_view = View::ResultsTable;
+                    self.close_popup();
                 }
                 _ => {}
             },
@@ -382,5 +382,10 @@ impl App {
         }
 
         return Ok(());
+    }
+    
+    fn close_popup(&mut self) {
+        self.json_view_model.data = None;
+        self.focused_view = View::ResultsTable;
     }
 }

@@ -1,3 +1,5 @@
+- BUG: Can scroll past last page (idk the pagination strat)
+- Set the minimum column width to be uuid
 - Make 0 and $ go to first and last char in row
 - Add export command
 - Put numbers on lines in the table

@@ -119,11 +119,11 @@ impl App {
         self.calculate_widgets_chunks();
 
         while self.running {
+            self.handle_events().await?;
+
             terminal.draw(|frame| {
                 self.render(frame);
             })?;
-
-            self.handle_events().await?;
         }
 
         return Ok(());
