@@ -1,11 +1,21 @@
-use ratatui::widgets::{Cell, Row, Table, TableState};
-use ratatui::{
-    Frame,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
-};
+use ratatui::Frame;
+use ratatui::layout::Alignment;
+use ratatui::layout::Constraint;
+use ratatui::layout::Direction;
+use ratatui::layout::Layout;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Cell;
+use ratatui::widgets::Paragraph;
+use ratatui::widgets::Row;
+use ratatui::widgets::Table;
+use ratatui::widgets::TableState;
 use serde_json::Value;
 
 use crate::models::table::TableModel;

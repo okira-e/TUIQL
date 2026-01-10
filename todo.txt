@@ -1,7 +1,10 @@
 - BUG: Can scroll past last page (idk the pagination strat)
-- Set the minimum column width to be uuid
-- Make 0 and $ go to first and last char in row
-- Add export command
+- BUG: The horizontal scrollbar needs to be subtracted by one for the last column that you can't scroll past
+- Add materialized view to the explorer
+- Remove the view and materialized views headers from the explorer if there are none
 - Put numbers on lines in the table
+- Colorize the dates better in the db
+- Set the minimum column width to be uuid
+- Add g to the json viewer
+- Add export command
 - Add searching the text already rendered in the table
-- Redesign the explorer widget

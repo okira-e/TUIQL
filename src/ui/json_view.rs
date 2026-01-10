@@ -1,16 +1,31 @@
-use ratatui::{
-    Frame,
-    layout::{Alignment, Rect},
-    style::Style,
-    text::{Line, Text},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
-};
+use ratatui::Frame;
+use ratatui::layout::Alignment;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Text;
+use ratatui::widgets::Block;
+use ratatui::widgets::BorderType;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Clear;
+use ratatui::widgets::Paragraph;
+use ratatui::widgets::Wrap;
 use serde::Serialize;
-use serde_json::{Serializer, Value, ser::PrettyFormatter};
+use serde_json::Serializer;
+use serde_json::Value;
+use serde_json::ser::PrettyFormatter;
 
-use crate::{models::json_view::JsonViewModel, theme::Theme};
+use crate::models::json_view::JsonViewModel;
+use crate::theme::Theme;
 
-pub fn render_json_view(model: &JsonViewModel, theme: &Theme, frame: &mut Frame, area: Rect) {
+pub fn render_json_view(
+    model: &JsonViewModel,
+    theme: &Theme,
+    frame: &mut Frame,
+    area: Rect,
+    focused: bool,
+) {
     match &model.data {
         None => return,
         Some(json_data) => {
@@ -23,7 +38,11 @@ pub fn render_json_view(model: &JsonViewModel, theme: &Theme, frame: &mut Frame,
             let block = Block::default()
                 .title("JSON VIEW")
                 .title_alignment(Alignment::Center)
-                .border_style(theme.pane_focus)
+                .border_style(if focused {
+                    theme.pane_focus
+                } else {
+                    Color::default()
+                })
                 .border_type(BorderType::Double)
                 .borders(Borders::ALL)
                 .style(Style::default().bg(theme.bg).fg(theme.fg));

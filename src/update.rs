@@ -1,18 +1,25 @@
+use arboard::Clipboard;
+use color_eyre::Result;
+use tracing::debug;
+
+use crate::actions::Action;
+use crate::actions::AppAction;
+use crate::actions::CommandAction;
+use crate::actions::DbAction;
+use crate::actions::ExplorerAction;
 use crate::actions::JsonViewAction;
+use crate::actions::ResultsTableAction;
 use crate::app::App;
+use crate::app::Pane;
+use crate::app::RightView;
 use crate::app::View;
 use crate::models::explorer::get_items_by_type;
 use crate::models::explorer::get_next_item_type;
 use crate::models::explorer::get_prev_item_type;
 use crate::models::statusline::MsgKind;
 use crate::models::statusline::MsgLifetime;
-use crate::models::statusline::StatusLineMsg;
-
-use arboard::Clipboard;
-use color_eyre::Result;
-use tracing::debug;
-
-use crate::actions::{Action, AppAction, DbAction, ExplorerAction, ResultsTableAction};
+use crate::models::statusline::StatusLineMode;
+use crate::models::statusline::StatusLineModel;
 
 impl App {
     pub async fn update(&mut self, action: Action) -> Result<()> {
@@ -24,6 +31,7 @@ impl App {
             Action::Explorer(action) => self.update_explorer(action),
             Action::ResultsTable(action) => self.update_results_table(action),
             Action::JsonView(action) => self.update_json_view(action)?,
+            Action::Command(action) => self.update_command(action).await?,
             Action::None => {}
         };
 
@@ -31,6 +39,7 @@ impl App {
     }
 
     async fn update_app(&mut self, action: AppAction) -> Result<()> {
+        let focused_view = self.get_focused_view();
         match action {
             AppAction::Quit => {
                 self.quit();
@@ -46,21 +55,21 @@ impl App {
                 if self.statusline_model.msg.created_at.elapsed()
                     > self.statusline_model.msg.lifetime.to_duration()
                 {
-                    self.statusline_model.msg = StatusLineMsg::default();
+                    self.statusline_model = StatusLineModel::default();
                 }
             }
             AppAction::CyclePane => {
-                if self.focused_view == View::Explorer {
-                    self.focused_view = View::ResultsTable;
+                if focused_view == View::Explorer {
+                    self.focused_pane = Pane::Right;
                 } else {
-                    self.focused_view = View::Explorer;
+                    self.focused_pane = Pane::Left;
                 }
             }
             AppAction::SelectTable(name) => {
                 self.db_driver.lock().await.reset_query_state();
                 self.table_model.reset(Some(0));
-                self.close_popup();
                 _ = self.action_tx.send(Action::Db(DbAction::QueryTable(name)));
+                self.focused_pane = Pane::Right;
             }
             AppAction::Resize(w, h) => {
                 self.area.width = w;
@@ -70,14 +79,15 @@ impl App {
             }
             AppAction::ViewSelectedRowAsJson => {
                 self.json_view_model.data = self.table_model.get_selected_row_data();
-                self.focused_view = View::JsonView;
+                self.json_view_model.scroll_y = 0;
+                self.right_view = RightView::JsonView;
             }
-            AppAction::ClosePopup => match self.focused_view {
-                View::JsonView => {
-                    self.close_popup();
-                }
-                _ => {}
-            },
+            AppAction::SetCommandMode => {
+                self.statusline_model.mode = StatusLineMode::Command;
+            }
+            AppAction::CloseJsonView => {
+                self.right_view = RightView::ResultsTable;
+            }
         }
 
         return Ok(());
@@ -226,11 +236,11 @@ impl App {
                         new_index.saturating_sub(visible_rows - 1);
                 }
             }
-            ResultsTableAction::GoToFirst => {
+            ResultsTableAction::GoToFirstVertically => {
                 self.table_model.selected_row = Some(0);
                 self.table_model.vertical_scroll_offset = 0;
             }
-            ResultsTableAction::GoToLast => {
+            ResultsTableAction::GoToLastVertically => {
                 self.table_model.selected_row = Some(total_rows - 1);
                 self.table_model.vertical_scroll_offset = total_rows.saturating_sub(visible_rows);
             }
@@ -246,6 +256,13 @@ impl App {
                         MsgLifetime::Short,
                     );
                 }
+            }
+            ResultsTableAction::GoToFirstHorizontally => {
+                self.table_model.horizontal_scroll_offset = 0;
+            }
+            ResultsTableAction::GoToLastHorizontally => {
+                self.table_model.horizontal_scroll_offset =
+                    self.table_model.query_result.columns.len() - 1;
             }
         }
     }
@@ -279,7 +296,6 @@ impl App {
                 let rows_fetched = results.rows.len();
                 self.table_model.query_result = results;
 
-                self.focused_view = View::ResultsTable;
                 self.table_model.table_name = table_name.clone();
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
                 self.table_model.current_pos = current_page;
@@ -366,6 +382,48 @@ impl App {
         return Ok(());
     }
 
+    async fn update_command(&mut self, action: CommandAction) -> Result<()> {
+        match action {
+            CommandAction::AddChar(c) => {
+                if c == ' ' && self.statusline_model.cmd.text.is_empty() {
+                    return Ok(());
+                }
+
+                self.statusline_model
+                    .cmd
+                    .text
+                    .insert(self.statusline_model.cmd.cursor, c);
+                self.statusline_model.cmd.cursor += 1;
+            }
+            CommandAction::PopChar => {
+                if self.statusline_model.cmd.cursor > 0 {
+                    self.statusline_model.cmd.cursor -= 1;
+                    self.statusline_model
+                        .cmd
+                        .text
+                        .remove(self.statusline_model.cmd.cursor);
+                }
+            }
+            CommandAction::MoveLeft => {
+                self.statusline_model.cmd.cursor =
+                    self.statusline_model.cmd.cursor.saturating_sub(1);
+            }
+            CommandAction::MoveRight => {
+                let new_pos = self.statusline_model.cmd.cursor + 1;
+                self.statusline_model.cmd.cursor =
+                    new_pos.min(self.statusline_model.cmd.text.len());
+            }
+            CommandAction::Execute => {
+                self.evaluate_user_command(&self.statusline_model.cmd.text.clone())
+                    .await?;
+                self.statusline_model.cmd.text = String::new();
+                self.statusline_model.cmd.cursor = 0;
+            }
+        }
+
+        return Ok(());
+    }
+
     fn update_json_view(&mut self, action: JsonViewAction) -> Result<()> {
         match action {
             JsonViewAction::MoveUp => {
@@ -382,10 +440,5 @@ impl App {
         }
 
         return Ok(());
-    }
-    
-    fn close_popup(&mut self) {
-        self.json_view_model.data = None;
-        self.focused_view = View::ResultsTable;
     }
 }

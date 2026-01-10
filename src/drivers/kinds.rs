@@ -1,6 +1,7 @@
+use std::str::FromStr;
+
 use color_eyre::eyre::bail;
 use serde::Deserialize;
-use std::str::FromStr;
 
 #[derive(Debug, Clone, Deserialize)]
 pub enum DbKinds {

@@ -1,15 +1,20 @@
-use ratatui::{
-    Frame,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style, Stylize},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
-};
+use ratatui::Frame;
+use ratatui::layout::Constraint;
+use ratatui::layout::Direction;
+use ratatui::layout::Layout;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
+use ratatui::style::Style;
+use ratatui::style::Stylize;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Paragraph;
 
-use crate::{
-    models::explorer::{ExplorerModel, get_items_by_type},
-    theme::Theme,
-};
+use crate::models::explorer::ExplorerModel;
+use crate::models::explorer::get_items_by_type;
+use crate::theme::Theme;
 
 pub fn render_explorer(
     model: &ExplorerModel,

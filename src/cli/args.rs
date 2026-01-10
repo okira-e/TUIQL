@@ -1,6 +1,8 @@
-use clap::{Args, Parser};
+use clap::Args;
+use clap::Parser;
 
-use crate::{cli, drivers};
+use crate::cli;
+use crate::drivers;
 
 #[derive(Debug, Parser)]
 #[command(version)]

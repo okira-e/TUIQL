@@ -1,29 +1,47 @@
-use crate::{
-    actions::Action,
-    config::Settings,
-    drivers::{self, DbDriver},
-    models::{
-        explorer::{ExplorerItem, ExplorerModel},
-        json_view::JsonViewModel,
-        statusline::{MsgKind, MsgLifetime, StatusLineMode, StatusLineModel, StatusLineMsg},
-        table::TableModel,
-    },
-    theme::{Flavor, Theme},
-};
+use std::sync::Arc;
+
 use color_eyre::Result;
 use crossterm::event::EventStream;
-use ratatui::{
-    DefaultTerminal,
-    layout::{Constraint, Direction, Layout, Rect},
-};
-use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc};
+use ratatui::DefaultTerminal;
+use ratatui::layout::Constraint;
+use ratatui::layout::Direction;
+use ratatui::layout::Layout;
+use ratatui::layout::Rect;
+use tokio::sync::Mutex;
+use tokio::sync::mpsc;
+
+use crate::actions::Action;
+use crate::config::Settings;
+use crate::drivers::DbDriver;
+use crate::drivers::{self};
+use crate::models::explorer::ExplorerItem;
+use crate::models::explorer::ExplorerModel;
+use crate::models::json_view::JsonViewModel;
+use crate::models::statusline::MsgKind;
+use crate::models::statusline::MsgLifetime;
+use crate::models::statusline::StatusLineMode;
+use crate::models::statusline::StatusLineModel;
+use crate::models::statusline::StatusLineMsg;
+use crate::models::table::TableModel;
+use crate::theme::Flavor;
+use crate::theme::Theme;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum View {
     Explorer,
     ResultsTable,
     StatusLine,
+    JsonView,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum Pane {
+    Left,
+    Right,
+}
+
+pub enum RightView {
+    ResultsTable,
     JsonView,
 }
 
@@ -40,7 +58,8 @@ pub struct App {
     pub event_stream: EventStream,
     pub action_tx: mpsc::UnboundedSender<Action>,
     pub action_rx: mpsc::UnboundedReceiver<Action>,
-    pub focused_view: View,
+    pub focused_pane: Pane,
+    pub right_view: RightView,
     pub widgets_chunks: WidgetsChunks,
     pub table_model: TableModel,
     pub explorer_model: ExplorerModel,
@@ -68,11 +87,13 @@ impl App {
             db_driver: Arc::new(Mutex::new(db_driver)),
             theme,
             selected_table: None,
-            focused_view: View::Explorer,
+            focused_pane: Pane::Left,
+            right_view: RightView::ResultsTable,
+            // active_temporary_widget: None,
             widgets_chunks: WidgetsChunks::default(),
             table_model: TableModel::default(),
             explorer_model: ExplorerModel::default(),
-            statusline_model: StatusLineModel::new(),
+            statusline_model: StatusLineModel::default(),
             json_view_model: JsonViewModel::default(),
             area: Rect::default(),
         };
@@ -164,6 +185,16 @@ impl App {
             kind,
             lifetime,
             created_at: std::time::Instant::now(),
+        };
+    }
+
+    pub fn get_focused_view(&self) -> View {
+        return match self.focused_pane {
+            Pane::Left => View::Explorer,
+            Pane::Right => match self.right_view {
+                RightView::ResultsTable => View::ResultsTable,
+                RightView::JsonView => View::JsonView,
+            },
         };
     }
 }

@@ -1,6 +1,7 @@
 use clap::Subcommand;
 
-use crate::cli::args::{ConnectCmdArgs, OpenCmdArgs};
+use crate::cli::args::ConnectCmdArgs;
+use crate::cli::args::OpenCmdArgs;
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {

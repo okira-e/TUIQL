@@ -1,15 +1,17 @@
 pub struct StatusLineModel {
     pub mode: StatusLineMode,
     pub msg: StatusLineMsg,
+    pub cmd: StatusLineCommand,
     pub is_loading: bool,
     pub spinner_animation_tick_count: usize,
 }
 
-impl StatusLineModel {
-    pub fn new() -> Self {
+impl Default for StatusLineModel {
+    fn default() -> Self {
         return Self {
             mode: StatusLineMode::Status,
             msg: StatusLineMsg::default(),
+            cmd: StatusLineCommand::default(),
             is_loading: false,
             spinner_animation_tick_count: 0,
         };
@@ -50,18 +52,30 @@ pub struct StatusLineMsg {
 
 impl Default for StatusLineMsg {
     fn default() -> Self {
-        Self {
+        return Self {
             text: String::from("Press ? for help"),
             kind: MsgKind::Neutral,
             lifetime: MsgLifetime::Forever,
             created_at: std::time::Instant::now(),
-        }
+        };
     }
 }
 
-pub struct StatusLineCommand {}
+pub struct StatusLineCommand {
+    pub text: String,
+    pub cursor: usize,
+}
+
+impl Default for StatusLineCommand {
+    fn default() -> Self {
+        return Self {
+            text: String::new(),
+            cursor: 0,
+        };
+    }
+}
 
 pub enum StatusLineMode {
     Status,
-    Command(StatusLineCommand),
+    Command,
 }

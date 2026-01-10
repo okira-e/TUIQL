@@ -1,7 +1,9 @@
-use color_eyre::{Result, eyre::bail};
+use std::path::PathBuf;
+
+use color_eyre::Result;
+use color_eyre::eyre::bail;
 use serde::Deserialize;
 use serde_json::Value;
-use std::path::PathBuf;
 
 use crate::drivers::kinds::DbKinds;
 

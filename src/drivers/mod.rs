@@ -3,10 +3,13 @@ pub mod kinds;
 pub mod postgres;
 // pub mod sqlite;
 
+use std::fmt;
+
 use async_trait::async_trait;
 use color_eyre::Result;
 
-use crate::drivers::{kinds::DbKinds, postgres::PostgresDriver};
+use crate::drivers::kinds::DbKinds;
+use crate::drivers::postgres::PostgresDriver;
 
 #[async_trait]
 pub trait DbDriver: Send + Sync {
@@ -56,4 +59,13 @@ pub enum PaginationStrategy {
     /// Holds the cursor based column
     Cursor(String),
     Offset,
+}
+
+impl fmt::Display for PaginationStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PaginationStrategy::Offset => write!(f, "Offset"),
+            PaginationStrategy::Cursor(_) => write!(f, "Cursor"),
+        }
+    }
 }

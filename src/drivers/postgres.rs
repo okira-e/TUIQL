@@ -4,12 +4,15 @@ use async_trait::async_trait;
 use color_eyre::Result;
 use dashmap::DashMap;
 use futures::TryStreamExt;
-use sqlx::{Postgres, Row, postgres::PgRow};
+use sqlx::Postgres;
+use sqlx::Row;
+use sqlx::postgres::PgRow;
 
-use crate::{
-    drivers::{self, ColumnMetadata, PaginationStrategy, QueryResult},
-    utils,
-};
+use crate::drivers::ColumnMetadata;
+use crate::drivers::PaginationStrategy;
+use crate::drivers::QueryResult;
+use crate::drivers::{self};
+use crate::utils;
 
 #[derive(Debug, Default, Clone)]
 pub struct QueryState {
@@ -21,7 +24,6 @@ pub struct QueryState {
     pub group_by: String,
     pub order_by: String,
     pub cursor_history: HashMap<String, Vec<usize>>,
-    pub row_count: Option<usize>,
 }
 
 impl QueryState {
@@ -34,7 +36,6 @@ impl QueryState {
             group_by: String::new(),
             order_by: String::new(),
             cursor_history: HashMap::new(),
-            row_count: None,
         };
     }
 }
@@ -220,15 +221,6 @@ impl drivers::DbDriver for PostgresDriver {
     }
 
     async fn query_count(&mut self, table_name: &str) -> Result<usize> {
-        let cache_hit = match &self.query_state.table_name {
-            Some(name) if name == table_name => self.query_state.row_count,
-            _ => None,
-        };
-
-        if let Some(c) = cache_hit {
-            return Ok(c);
-        }
-
         let ident = utils::quote_ident(table_name);
 
         let sql = format!(
@@ -240,11 +232,7 @@ impl drivers::DbDriver for PostgresDriver {
 
         let count_usize = count as usize;
 
-        // update cache
-        self.query_state.table_name = Some(table_name.to_string());
-        self.query_state.row_count = Some(count_usize);
-
-        Ok(count_usize)
+        return Ok(count_usize);
     }
 
     async fn get_order_by_clause(&mut self, table_name: &str) -> Result<String> {

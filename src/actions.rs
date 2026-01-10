@@ -7,6 +7,7 @@ pub enum Action {
     ResultsTable(ResultsTableAction),
     Db(DbAction),
     JsonView(JsonViewAction),
+    Command(CommandAction),
     None,
 }
 
@@ -18,7 +19,8 @@ pub enum AppAction {
     SelectTable(String),
     Resize(u16, u16),
     ViewSelectedRowAsJson,
-    ClosePopup,
+    CloseJsonView,
+    SetCommandMode,
 }
 
 #[derive(Debug, Clone)]
@@ -36,8 +38,10 @@ pub enum ResultsTableAction {
     ScrollRight,
     JumpUp,
     JumpDown,
-    GoToFirst,
-    GoToLast,
+    GoToFirstVertically,
+    GoToLastVertically,
+    GoToFirstHorizontally,
+    GoToLastHorizontally,
     YankSelection,
 }
 
@@ -56,4 +60,13 @@ pub enum JsonViewAction {
     MoveUp,
     MoveDown,
     GoToFirst,
+}
+
+#[derive(Debug, Clone)]
+pub enum CommandAction {
+    AddChar(char),
+    PopChar,
+    MoveLeft,
+    MoveRight,
+    Execute,
 }

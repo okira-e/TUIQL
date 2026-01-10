@@ -1,7 +1,8 @@
 use ratatui::layout::Constraint;
 use serde_json::Value;
 
-use crate::drivers::{ColumnMetadata, QueryResult};
+use crate::drivers::ColumnMetadata;
+use crate::drivers::QueryResult;
 
 #[derive(Debug, Default)]
 pub struct TableModel {

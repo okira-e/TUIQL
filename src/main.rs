@@ -1,9 +1,10 @@
 mod actions;
 mod app;
 mod cli;
+mod commander;
 mod config;
 mod drivers;
-mod handlers;
+mod events;
 mod logging;
 mod models;
 mod render;
