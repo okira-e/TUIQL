@@ -13,9 +13,9 @@ use crate::app::App;
 use crate::app::Pane;
 use crate::app::RightView;
 use crate::app::View;
-use crate::models::explorer::get_items_by_type;
-use crate::models::explorer::get_next_item_type;
-use crate::models::explorer::get_prev_item_type;
+use crate::models::explorer::get_items_by_kind;
+use crate::models::explorer::get_next_item_kind;
+use crate::models::explorer::get_prev_item_kind;
 use crate::models::statusline::MsgKind;
 use crate::models::statusline::MsgLifetime;
 use crate::models::statusline::StatusLineMode;
@@ -100,7 +100,7 @@ impl App {
 
                 if current_index > 0 {
                     self.explorer_model.focused_item = Some(
-                        get_items_by_type(
+                        get_items_by_kind(
                             &self.explorer_model.items,
                             &self.explorer_model.focused_item.clone().unwrap().kind,
                         )[current_index - 1]
@@ -108,8 +108,8 @@ impl App {
                     );
                 } else {
                     let prev_item_type =
-                        get_prev_item_type(&self.explorer_model.focused_item.clone().unwrap().kind);
-                    let prev_items = get_items_by_type(&self.explorer_model.items, &prev_item_type);
+                        get_prev_item_kind(&self.explorer_model.focused_item.clone().unwrap().kind);
+                    let prev_items = get_items_by_kind(&self.explorer_model.items, &prev_item_type);
 
                     if prev_items.len() > 0 {
                         self.explorer_model.focused_item =
@@ -121,14 +121,14 @@ impl App {
                 let current_index = self.explorer_model.focused_item.clone().unwrap().index;
 
                 if current_index + 1
-                    < get_items_by_type(
+                    < get_items_by_kind(
                         &self.explorer_model.items,
                         &self.explorer_model.focused_item.clone().unwrap().kind,
                     )
                     .len()
                 {
                     self.explorer_model.focused_item = Some(
-                        get_items_by_type(
+                        get_items_by_kind(
                             &self.explorer_model.items,
                             &self.explorer_model.focused_item.clone().unwrap().kind,
                         )[current_index + 1]
@@ -136,11 +136,11 @@ impl App {
                     );
                 } else {
                     let next_item_type =
-                        get_next_item_type(&self.explorer_model.focused_item.clone().unwrap().kind);
+                        get_next_item_kind(&self.explorer_model.focused_item.clone().unwrap().kind);
 
-                    if get_items_by_type(&self.explorer_model.items, &next_item_type).len() > 0 {
+                    if get_items_by_kind(&self.explorer_model.items, &next_item_type).len() > 0 {
                         self.explorer_model.focused_item = Some(
-                            get_items_by_type(&self.explorer_model.items, &next_item_type)[0]
+                            get_items_by_kind(&self.explorer_model.items, &next_item_type)[0]
                                 .clone(),
                         );
                     }
@@ -148,11 +148,11 @@ impl App {
             }
             ExplorerAction::ExpandNextItemType => {
                 let current_type = &self.explorer_model.focused_item.clone().unwrap().kind;
-                let next_type = get_next_item_type(current_type);
+                let next_type = get_next_item_kind(current_type);
 
-                if get_items_by_type(&self.explorer_model.items, &next_type).len() > 0 {
+                if get_items_by_kind(&self.explorer_model.items, &next_type).len() > 0 {
                     self.explorer_model.focused_item =
-                        Some(get_items_by_type(&self.explorer_model.items, &next_type)[0].clone());
+                        Some(get_items_by_kind(&self.explorer_model.items, &next_type)[0].clone());
                 }
             }
         }

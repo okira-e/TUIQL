@@ -15,6 +15,7 @@ use crate::config::Settings;
 use crate::drivers::DbDriver;
 use crate::drivers::{self};
 use crate::models::explorer::ExplorerItem;
+use crate::models::explorer::ExplorerItemKind;
 use crate::models::explorer::ExplorerModel;
 use crate::models::json_view::JsonViewModel;
 use crate::models::statusline::MsgKind;
@@ -111,7 +112,7 @@ impl App {
             .enumerate()
             .map(|(i, name)| ExplorerItem {
                 name: name.clone(),
-                kind: "table".to_string(),
+                kind: ExplorerItemKind::Table,
                 index: i,
             })
             .collect();
@@ -121,7 +122,7 @@ impl App {
             .enumerate()
             .map(|(i, name)| ExplorerItem {
                 name: name.clone(),
-                kind: "view".to_string(),
+                kind: ExplorerItemKind::View,
                 index: i,
             })
             .collect();

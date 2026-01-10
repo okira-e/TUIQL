@@ -3,17 +3,17 @@ use ratatui::layout::Constraint;
 use ratatui::layout::Direction;
 use ratatui::layout::Layout;
 use ratatui::layout::Rect;
-use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
-use ratatui::text::Span;
 use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Paragraph;
 
+use crate::models::explorer::ExplorerItem;
+use crate::models::explorer::ExplorerItemKind;
 use crate::models::explorer::ExplorerModel;
-use crate::models::explorer::get_items_by_type;
+use crate::models::explorer::get_items_by_kind;
 use crate::theme::Theme;
 
 pub fn render_explorer(
@@ -23,133 +23,115 @@ pub fn render_explorer(
     area: Rect,
     focused: bool,
 ) {
-    let container_border_style = if focused {
+    let border_style = if focused {
         Style::default().fg(theme.pane_focus)
     } else {
         Style::default().bg(theme.bg)
     };
 
-    let container_block = Block::default()
+    let container = Block::default()
         .title("Database Schema")
-        .border_style(container_border_style)
+        .border_style(border_style)
         .borders(Borders::ALL);
 
-    if model.items.len() == 0 {
-        frame.render_widget(container_block.clone(), area);
-        frame.render_widget(
-            Paragraph::new("\n\nDatabase is empty").centered(),
-            container_block.inner(area),
-        );
+    frame.render_widget(&container, area);
+    let inner = container.inner(area);
+
+    if model.items.is_empty() {
+        frame.render_widget(Paragraph::new("\n\nDatabase is empty").centered(), inner);
         return;
     }
 
-    assert!(model.focused_item.is_some());
-    let focused_item = model.focused_item.as_ref().unwrap();
+    let focused_item = model.focused_item.as_ref();
 
-    let mut layout_constraints_arr = vec![];
+    let tables = get_items_by_kind(&model.items, &ExplorerItemKind::Table);
+    let views = get_items_by_kind(&model.items, &ExplorerItemKind::View);
 
-    let tables_count = get_items_by_type(&model.items, "table").len();
-    let views_count = get_items_by_type(&model.items, "view").len();
+    let mut constraints = Vec::new();
 
-    layout_constraints_arr.push(Constraint::Length(1));
-    if tables_count > 0 && focused_item.clone().kind == "table" {
-        layout_constraints_arr.push(Constraint::Length(tables_count as u16));
+    // Tables section
+    constraints.push(Constraint::Length(1)); // Header
+    if focused_item.is_some_and(|f| f.kind == ExplorerItemKind::Table) {
+        constraints.push(Constraint::Length(tables.len() as u16));
     }
 
-    layout_constraints_arr.push(Constraint::Length(1));
-    if views_count > 0 && focused_item.clone().kind == "view" {
-        layout_constraints_arr.push(Constraint::Length(views_count as u16));
+    // Views section
+    constraints.push(Constraint::Length(1)); // Header
+    if focused_item.is_some_and(|f| f.kind == ExplorerItemKind::View) {
+        constraints.push(Constraint::Length(views.len() as u16));
     }
 
-    // Render outer block and get the inner rect
-    frame.render_widget(&container_block, area);
-
-    let inner_area = container_block.inner(area);
     let layout = Layout::default()
         .direction(Direction::Vertical)
-        .constraints(layout_constraints_arr)
-        .split(inner_area);
+        .constraints(constraints)
+        .split(inner);
 
-    let focused_element_style = theme.selection;
-
-    let mut next_buff_idx = 0;
+    let mut idx = 0;
 
     //
-    // Render tables
+    // Tables
     //
+    frame.render_widget(
+        section_title(ExplorerItemKind::Table, focused_item, theme),
+        layout[idx],
+    );
+    idx += 1;
 
-    let title = Line::from(if focused_item.kind == "table" {
-        "▼ Tables"
-    } else {
-        "▶ Tables"
-    })
-    .style(theme.fg)
-    .bold();
+    if focused_item.is_some_and(|f| f.kind == ExplorerItemKind::Table) {
+        let lines = tables
+            .iter()
+            .map(|item| explorer_line(item, focused_item, focused, theme));
 
-    frame.render_widget(title, layout[next_buff_idx]);
-    next_buff_idx += 1;
-
-    if focused_item.kind == "table".to_string() {
-        let mut table_lines: Vec<Line> = vec![];
-        let tables = get_items_by_type(&model.items, "table");
-        for table in tables {
-            let line =
-                if focused_item.name.eq(&table.name) && focused_item.kind == "table".to_string() {
-                    let indentation_span = Span::raw("  > ");
-                    indentation_span.clone()
-                        + Span::from(table.name.clone()).style(if focused {
-                            focused_element_style
-                        } else {
-                            Color::default()
-                        })
-                } else {
-                    let indentation_span = Span::raw("    ");
-                    indentation_span.clone() + Span::from(table.name.clone()).style(theme.fg)
-                };
-
-            table_lines.push(line);
-        }
-
-        frame.render_widget(Paragraph::new(table_lines), layout[next_buff_idx]);
-        next_buff_idx += 1;
+        frame.render_widget(Paragraph::new(lines.collect::<Vec<_>>()), layout[idx]);
+        idx += 1;
     }
 
     //
-    // Render views
+    // Views
     //
+    frame.render_widget(
+        section_title(ExplorerItemKind::View, focused_item, theme),
+        layout[idx],
+    );
+    idx += 1;
 
-    let title = Line::from(if focused_item.kind == "view" {
-        "▼ Views"
-    } else {
-        "▶ Views"
-    })
-    .style(theme.fg)
-    .bold();
+    if focused_item.is_some_and(|f| f.kind == ExplorerItemKind::View) {
+        let lines = views
+            .iter()
+            .map(|item| explorer_line(item, focused_item, focused, theme));
 
-    frame.render_widget(title, layout[next_buff_idx]);
-    next_buff_idx += 1;
-
-    if focused_item.kind == "view" {
-        let mut view_lines: Vec<Line> = vec![];
-        let views = get_items_by_type(&model.items, "view");
-        for view in views {
-            let line =
-                if focused_item.name.eq(&view.name) && focused_item.kind == "view".to_string() {
-                    let indentation_span = Span::raw("  > ").style(theme.fg);
-                    indentation_span.clone()
-                        + Span::from(view.name.clone()).style(if focused {
-                            focused_element_style
-                        } else {
-                            Color::default()
-                        })
-                } else {
-                    let indentation_span = Span::raw("    ");
-                    indentation_span.clone() + Span::from(view.name.clone()).style(theme.fg)
-                };
-
-            view_lines.push(line);
-        }
-
-        frame.render_widget(Paragraph::new(view_lines), layout[next_buff_idx]);
+        frame.render_widget(Paragraph::new(lines.collect::<Vec<_>>()), layout[idx]);
     }
+}
+
+fn section_title(
+    kind: ExplorerItemKind,
+    focused_item: Option<&ExplorerItem>,
+    theme: &Theme,
+) -> Line<'static> {
+    let focused = focused_item.is_some_and(|f| f.kind == kind);
+
+    Line::from(format!("{} {}", kind.arrow(focused), kind.label()))
+        .style(theme.fg)
+        .bold()
+}
+
+fn explorer_line(
+    item: &ExplorerItem,
+    focused_item: Option<&ExplorerItem>,
+    pane_focused: bool,
+    theme: &Theme,
+) -> Line<'static> {
+    let selected = focused_item.is_some_and(|f| f.name == item.name && f.kind == item.kind);
+
+    let prefix = if selected { "  > " } else { "    " };
+    let content = format!("{prefix}{}", item.name);
+
+    let style = if selected && pane_focused {
+        theme.selection
+    } else {
+        theme.fg
+    };
+
+    Line::from(content).style(style)
 }

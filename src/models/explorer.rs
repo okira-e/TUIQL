@@ -1,8 +1,27 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExplorerItem {
     pub name: String,
-    pub kind: String,
+    pub kind: ExplorerItemKind,
     pub index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExplorerItemKind {
+    Table,
+    View,
+}
+
+impl ExplorerItemKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Table => "Tables",
+            Self::View => "Views",
+        }
+    }
+
+    pub fn arrow(&self, focused: bool) -> &'static str {
+        if focused { "▼" } else { "▶" }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -13,30 +32,27 @@ pub struct ExplorerModel {
     pub items: Vec<ExplorerItem>,
 }
 
-pub fn get_items_by_type(items: &Vec<ExplorerItem>, item_type: &str) -> Vec<ExplorerItem> {
+pub fn get_items_by_kind(
+    items: &Vec<ExplorerItem>,
+    item_type: &ExplorerItemKind,
+) -> Vec<ExplorerItem> {
     return items
         .iter()
-        .filter(|e| e.kind == item_type)
+        .filter(|e| e.kind == *item_type)
         .cloned()
         .collect();
 }
 
-pub fn get_next_item_type(current_type: &str) -> String {
-    match current_type {
-        "table" => "view".to_string(),
-        "view" => "procedure".to_string(),
-        "procedure" => "function".to_string(),
-        "function" => "table".to_string(),
-        _ => "table".to_string(),
-    }
+pub fn get_next_item_kind(current_type: &ExplorerItemKind) -> ExplorerItemKind {
+    return match current_type {
+        ExplorerItemKind::Table => ExplorerItemKind::View,
+        ExplorerItemKind::View => ExplorerItemKind::Table,
+    };
 }
 
-pub fn get_prev_item_type(current_type: &str) -> String {
-    match current_type {
-        "table" => "function".to_string(),
-        "view" => "table".to_string(),
-        "procedure" => "view".to_string(),
-        "function" => "procedure".to_string(),
-        _ => "table".to_string(),
-    }
+pub fn get_prev_item_kind(current_type: &ExplorerItemKind) -> ExplorerItemKind {
+    return match current_type {
+        ExplorerItemKind::Table => ExplorerItemKind::View,
+        ExplorerItemKind::View => ExplorerItemKind::Table,
+    };
 }
