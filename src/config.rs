@@ -126,8 +126,7 @@ pub fn create_config_if_not_exists() -> Result<()> {
         let connections_file_path = config_dir.join("connections.json");
         if !connections_file_path.exists() {
             let connections_config_file = std::fs::File::create(&connections_file_path)?;
-            const DEFAULT_CONNECTIONS_CONFIG: &str =
-                include_str!("../assets/config/default_connections_config.json");
+            const DEFAULT_CONNECTIONS_CONFIG: &str = include_str!("../assets/config/default_connections_config.json");
             let default_config: Value = serde_json::from_str(DEFAULT_CONNECTIONS_CONFIG)?;
             serde_json::to_writer(connections_config_file, &default_config)?;
         }
@@ -136,8 +135,7 @@ pub fn create_config_if_not_exists() -> Result<()> {
         let settings_file_path = config_dir.join("settings.json");
         if !settings_file_path.exists() {
             let settings_config_file = std::fs::File::create(&settings_file_path)?;
-            const DEFAULT_SETTINGS_CONFIG: &str =
-                include_str!("../assets/config/default_settings_config.json");
+            const DEFAULT_SETTINGS_CONFIG: &str = include_str!("../assets/config/default_settings_config.json");
             let default_config: Value = serde_json::from_str(DEFAULT_SETTINGS_CONFIG)?;
             serde_json::to_writer(settings_config_file, &default_config)?;
         }

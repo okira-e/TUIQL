@@ -19,13 +19,7 @@ use ratatui::widgets::Row;
 use ratatui::widgets::Table;
 use serde_json::Value;
 
-pub fn render_table(
-    model: &mut TableModel,
-    theme: &Theme,
-    frame: &mut Frame,
-    area: Rect,
-    focused: bool,
-) {
+pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, area: Rect, focused: bool) {
     let container_border_style = if focused {
         Style::default().fg(theme.pane_focus)
     } else {
@@ -80,22 +74,18 @@ pub fn render_table(
         let mut values = vec![];
         for key in visible_cols.iter() {
             let cell = match row_map[&key.name].clone() {
-                Value::Null => Cell::from("null").style(
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::ITALIC),
-                ),
-                Value::Bool(b) => {
-                    Cell::from(b.to_string()).style(Style::default().fg(Color::Yellow))
+                Value::Null => {
+                    Cell::from("null").style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC))
                 }
-                Value::Number(number) => {
-                    Cell::from(number.to_string()).style(Style::default().fg(Color::Cyan))
-                }
+                Value::Bool(b) => Cell::from(b.to_string()).style(Style::default().fg(Color::Yellow)),
+                Value::Number(number) => Cell::from(number.to_string()).style(Style::default().fg(Color::Cyan)),
                 Value::String(s) => Cell::from(s.clone()).style(theme.fg),
-                Value::Array(values) => Cell::from(format!("[{} items]", values.len()))
-                    .style(Style::default().fg(Color::Magenta)),
-                Value::Object(map) => Cell::from(format!("{{{} keys}}", map.len()))
-                    .style(Style::default().fg(Color::Blue)),
+                Value::Array(values) => {
+                    Cell::from(format!("[{} items]", values.len())).style(Style::default().fg(Color::Magenta))
+                }
+                Value::Object(map) => {
+                    Cell::from(format!("{{{} keys}}", map.len())).style(Style::default().fg(Color::Blue))
+                }
             };
 
             values.push(cell);
@@ -107,14 +97,9 @@ pub fn render_table(
     let constraints = vec![Constraint::Max(40); visible_cols.len()];
     let table = Table::new(table_rows, constraints)
         .header(
-            Row::new(
-                visible_cols
-                    .iter()
-                    .map(|col| col.name.clone())
-                    .collect::<Vec<String>>(),
-            )
-            .style(Style::default().add_modifier(Modifier::BOLD))
-            .bottom_margin(1), // Space between header and rows
+            Row::new(visible_cols.iter().map(|col| col.name.clone()).collect::<Vec<String>>())
+                .style(Style::default().add_modifier(Modifier::BOLD))
+                .bottom_margin(1), // Space between header and rows
         )
         .row_highlight_style(if focused {
             Style::default().bg(Color::DarkGray)
@@ -131,12 +116,10 @@ pub fn render_table(
     //
 
     if model.should_draw_scrollbar(area.width) {
-        let scrollbar_width =
-            (1.0 / (model.query_result.columns.len() as f32 / 1 as f32)) * area.width as f32;
+        let scrollbar_width = (1.0 / (model.query_result.columns.len() as f32 / 1 as f32)) * area.width as f32;
 
         let offset_width = (1.0 / model.query_result.columns.len() as f32) * area.width as f32;
-        let scrollbar_offset =
-            String::from(" ").repeat(offset_width as usize * model.horizontal_scroll_offset);
+        let scrollbar_offset = String::from(" ").repeat(offset_width as usize * model.horizontal_scroll_offset);
 
         let scrollbar = String::from("▃").repeat(scrollbar_width.round() as usize);
 

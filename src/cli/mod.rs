@@ -1,16 +1,14 @@
 pub mod args;
 pub mod commands;
-
+use crate::app::App;
+use crate::cli::commands::Commands;
+use crate::config;
+use crate::drivers;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
 use tabled::Table;
 use tabled::Tabled;
 use url::Url;
-
-use crate::app::App;
-use crate::cli::commands::Commands;
-use crate::config;
-use crate::drivers;
 
 pub async fn run(args: args::AppArgs) -> Result<()> {
     if args.config_path {

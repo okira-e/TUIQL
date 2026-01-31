@@ -115,21 +115,13 @@ impl App {
         let tables: Vec<ExplorerItem> = tables
             .iter()
             .enumerate()
-            .map(|(i, name)| ExplorerItem {
-                name: name.clone(),
-                kind: ExplorerItemKind::Table,
-                index: i,
-            })
+            .map(|(i, name)| ExplorerItem { name: name.clone(), kind: ExplorerItemKind::Table, index: i })
             .collect();
 
         let views: Vec<ExplorerItem> = views
             .iter()
             .enumerate()
-            .map(|(i, name)| ExplorerItem {
-                name: name.clone(),
-                kind: ExplorerItemKind::View,
-                index: i,
-            })
+            .map(|(i, name)| ExplorerItem { name: name.clone(), kind: ExplorerItemKind::View, index: i })
             .collect();
 
         let materialized: Vec<ExplorerItem> = materizlied
@@ -142,11 +134,7 @@ impl App {
             })
             .collect();
 
-        let items: Vec<_> = tables
-            .into_iter()
-            .chain(views)
-            .chain(materialized)
-            .collect();
+        let items: Vec<_> = tables.into_iter().chain(views).chain(materialized).collect();
 
         self.explorer_model.items = items;
         if !self.explorer_model.items.is_empty() {
@@ -197,12 +185,7 @@ impl App {
         self.widgets_chunks.statusline_chunk = app_statusline_split[1];
     }
 
-    pub fn report_message(
-        &mut self,
-        text: impl Into<String>,
-        kind: MsgKind,
-        lifetime: MsgLifetime,
-    ) {
+    pub fn report_message(&mut self, text: impl Into<String>, kind: MsgKind, lifetime: MsgLifetime) {
         self.statusline_model.mode = StatusLineMode::Status;
         self.statusline_model.msg = StatusLineMsg {
             text: text.into(),

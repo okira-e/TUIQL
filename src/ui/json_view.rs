@@ -19,13 +19,7 @@ use serde_json::ser::PrettyFormatter;
 use crate::models::json_view::JsonViewModel;
 use crate::theme::Theme;
 
-pub fn render_json_view(
-    model: &JsonViewModel,
-    theme: &Theme,
-    frame: &mut Frame,
-    area: Rect,
-    focused: bool,
-) {
+pub fn render_json_view(model: &JsonViewModel, theme: &Theme, frame: &mut Frame, area: Rect, focused: bool) {
     match &model.data {
         None => return,
         Some(json_data) => {
@@ -38,11 +32,7 @@ pub fn render_json_view(
             let block = Block::default()
                 .title("JSON VIEW")
                 .title_alignment(Alignment::Center)
-                .border_style(if focused {
-                    theme.pane_focus
-                } else {
-                    Color::default()
-                })
+                .border_style(if focused { theme.pane_focus } else { Color::default() })
                 .border_type(BorderType::Double)
                 .borders(Borders::ALL)
                 .style(Style::default().bg(theme.bg).fg(theme.fg));

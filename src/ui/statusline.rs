@@ -11,13 +11,7 @@ use crate::models::statusline::StatusLineMode;
 use crate::models::statusline::StatusLineModel;
 use crate::theme::Theme;
 
-pub fn render_statusline(
-    model: &StatusLineModel,
-    theme: &Theme,
-    frame: &mut Frame,
-    area: Rect,
-    focused: bool,
-) {
+pub fn render_statusline(model: &StatusLineModel, theme: &Theme, frame: &mut Frame, area: Rect, focused: bool) {
     if model.is_loading {
         // Construct throbber state from its state in the model.
         let mut throbber_state = throbber_widgets_tui::ThrobberState::default();
@@ -56,10 +50,7 @@ pub fn render_statusline(
 
             frame.render_widget(&line_widget, area);
             if focused {
-                frame.set_cursor_position(Position {
-                    x: area.x + model.cmd.cursor as u16 + 2,
-                    y: area.y + 1,
-                });
+                frame.set_cursor_position(Position { x: area.x + model.cmd.cursor as u16 + 2, y: area.y + 1 });
             }
         }
     }

@@ -54,17 +54,13 @@ impl App {
         let focused_view = self.get_focused_view();
         match focused_view {
             View::ResultsTable => match (key.modifiers, key.code) {
-                (_, KeyCode::Char('k') | KeyCode::Up)
-                | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
-                    self.update(Action::ResultsTable(ResultsTableAction::MoveUp))
-                        .await?;
+                (_, KeyCode::Char('k') | KeyCode::Up) | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
+                    self.update(Action::ResultsTable(ResultsTableAction::MoveUp)).await?;
                     return Ok(());
                 }
 
-                (_, KeyCode::Char('j') | KeyCode::Down)
-                | (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
-                    self.update(Action::ResultsTable(ResultsTableAction::MoveDown))
-                        .await?;
+                (_, KeyCode::Char('j') | KeyCode::Down) | (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
+                    self.update(Action::ResultsTable(ResultsTableAction::MoveDown)).await?;
                     return Ok(());
                 }
 
@@ -97,14 +93,12 @@ impl App {
                 }
 
                 (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
-                    self.update(Action::ResultsTable(ResultsTableAction::JumpUp))
-                        .await?;
+                    self.update(Action::ResultsTable(ResultsTableAction::JumpUp)).await?;
                     return Ok(());
                 }
 
                 (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
-                    self.update(Action::ResultsTable(ResultsTableAction::JumpDown))
-                        .await?;
+                    self.update(Action::ResultsTable(ResultsTableAction::JumpDown)).await?;
                     return Ok(());
                 }
 
@@ -133,8 +127,7 @@ impl App {
                 }
 
                 (_, KeyCode::Enter) => {
-                    self.update(Action::App(AppAction::ViewSelectedRowAsJson))
-                        .await?;
+                    self.update(Action::App(AppAction::ViewSelectedRowAsJson)).await?;
                     return Ok(());
                 }
 
@@ -148,41 +141,33 @@ impl App {
             },
 
             View::Explorer => match (key.modifiers, key.code) {
-                (_, KeyCode::Char('k') | KeyCode::Up)
-                | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
-                    self.update(Action::Explorer(ExplorerAction::MoveUp))
-                        .await?;
+                (_, KeyCode::Char('k') | KeyCode::Up) | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
+                    self.update(Action::Explorer(ExplorerAction::MoveUp)).await?;
                     return Ok(());
                 }
 
-                (_, KeyCode::Char('j') | KeyCode::Down)
-                | (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
-                    self.update(Action::Explorer(ExplorerAction::MoveDown))
-                        .await?;
+                (_, KeyCode::Char('j') | KeyCode::Down) | (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
+                    self.update(Action::Explorer(ExplorerAction::MoveDown)).await?;
                     return Ok(());
                 }
 
                 (_, KeyCode::Char(']')) => {
-                    self.update(Action::Explorer(ExplorerAction::NextTab))
-                        .await?;
+                    self.update(Action::Explorer(ExplorerAction::NextTab)).await?;
                     return Ok(());
                 }
 
                 (_, KeyCode::Char('[')) => {
-                    self.update(Action::Explorer(ExplorerAction::PrevTab))
-                        .await?;
+                    self.update(Action::Explorer(ExplorerAction::PrevTab)).await?;
                     return Ok(());
                 }
 
                 (_, KeyCode::Char('g')) => {
-                    self.update(Action::Explorer(ExplorerAction::GoToFirst))
-                        .await?;
+                    self.update(Action::Explorer(ExplorerAction::GoToFirst)).await?;
                     return Ok(());
                 }
 
                 (_, KeyCode::Char('G')) => {
-                    self.update(Action::Explorer(ExplorerAction::GoToLast))
-                        .await?;
+                    self.update(Action::Explorer(ExplorerAction::GoToLast)).await?;
                     return Ok(());
                 }
 
@@ -199,8 +184,7 @@ impl App {
 
             View::StatusLine => match (key.modifiers, key.code) {
                 (_, KeyCode::Char(c)) => {
-                    self.update(Action::Command(CommandAction::AddChar(c)))
-                        .await?;
+                    self.update(Action::Command(CommandAction::AddChar(c))).await?;
                     return Ok(());
                 }
 
@@ -210,14 +194,12 @@ impl App {
                 }
 
                 (_, KeyCode::Left) => {
-                    self.update(Action::Command(CommandAction::MoveLeft))
-                        .await?;
+                    self.update(Action::Command(CommandAction::MoveLeft)).await?;
                     return Ok(());
                 }
 
                 (_, KeyCode::Right) => {
-                    self.update(Action::Command(CommandAction::MoveRight))
-                        .await?;
+                    self.update(Action::Command(CommandAction::MoveRight)).await?;
                     return Ok(());
                 }
 
@@ -230,17 +212,13 @@ impl App {
             },
 
             View::JsonView => match (key.modifiers, key.code) {
-                (_, KeyCode::Char('k') | KeyCode::Up)
-                | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
-                    self.update(Action::JsonView(JsonViewAction::MoveUp))
-                        .await?;
+                (_, KeyCode::Char('k') | KeyCode::Up) | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
+                    self.update(Action::JsonView(JsonViewAction::MoveUp)).await?;
                     return Ok(());
                 }
 
-                (_, KeyCode::Char('j') | KeyCode::Down)
-                | (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
-                    self.update(Action::JsonView(JsonViewAction::MoveDown))
-                        .await?;
+                (_, KeyCode::Char('j') | KeyCode::Down) | (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
+                    self.update(Action::JsonView(JsonViewAction::MoveDown)).await?;
                     return Ok(());
                 }
 

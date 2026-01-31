@@ -44,15 +44,11 @@ impl App {
             }
             AppAction::Tick => {
                 // Increment tick count for spinner animation
-                self.statusline_model.spinner_animation_tick_count = self
-                    .statusline_model
-                    .spinner_animation_tick_count
-                    .wrapping_add(1);
+                self.statusline_model.spinner_animation_tick_count =
+                    self.statusline_model.spinner_animation_tick_count.wrapping_add(1);
 
                 // Check if message has expired
-                if self.statusline_model.msg.created_at.elapsed()
-                    > self.statusline_model.msg.lifetime.to_duration()
-                {
+                if self.statusline_model.msg.created_at.elapsed() > self.statusline_model.msg.lifetime.to_duration() {
                     self.statusline_model = StatusLineModel::default();
                 }
             }
@@ -104,9 +100,7 @@ impl App {
                 let visible_items = match model.selected_tab {
                     ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
                     ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
-                    ExplorerItemKind::MaterializedView => {
-                        model.get_items_by_kind(ExplorerItemKind::MaterializedView)
-                    }
+                    ExplorerItemKind::MaterializedView => model.get_items_by_kind(ExplorerItemKind::MaterializedView),
                 };
 
                 if visible_items.is_empty() {
@@ -123,9 +117,7 @@ impl App {
                 let visible_items = match model.selected_tab {
                     ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
                     ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
-                    ExplorerItemKind::MaterializedView => {
-                        model.get_items_by_kind(ExplorerItemKind::MaterializedView)
-                    }
+                    ExplorerItemKind::MaterializedView => model.get_items_by_kind(ExplorerItemKind::MaterializedView),
                 };
 
                 if visible_items.is_empty() {
@@ -183,9 +175,7 @@ impl App {
                 let visible_items = match model.selected_tab {
                     ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
                     ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
-                    ExplorerItemKind::MaterializedView => {
-                        model.get_items_by_kind(ExplorerItemKind::MaterializedView)
-                    }
+                    ExplorerItemKind::MaterializedView => model.get_items_by_kind(ExplorerItemKind::MaterializedView),
                 };
 
                 if visible_items.is_empty() {
@@ -202,9 +192,7 @@ impl App {
                 let visible_items = match model.selected_tab {
                     ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
                     ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
-                    ExplorerItemKind::MaterializedView => {
-                        model.get_items_by_kind(ExplorerItemKind::MaterializedView)
-                    }
+                    ExplorerItemKind::MaterializedView => model.get_items_by_kind(ExplorerItemKind::MaterializedView),
                 };
 
                 if visible_items.is_empty() {
@@ -234,8 +222,7 @@ impl App {
 
         // Calculate how many rows fit in the viewport
         let table_header_and_footer_height = 5;
-        let visible_rows =
-            (self.widgets_chunks.table_chunk.height - table_header_and_footer_height) as usize;
+        let visible_rows = (self.widgets_chunks.table_chunk.height - table_header_and_footer_height) as usize;
 
         match action {
             ResultsTableAction::MoveUp => {
@@ -258,8 +245,7 @@ impl App {
                 // Only scroll down if cursor would go BELOW the viewport
                 let viewport_bottom = *self.table_model.table_state.offset_mut() + visible_rows;
                 if new_index >= viewport_bottom {
-                    *self.table_model.table_state.offset_mut() =
-                        new_index.saturating_sub(visible_rows - 1);
+                    *self.table_model.table_state.offset_mut() = new_index.saturating_sub(visible_rows - 1);
                 }
             }
             ResultsTableAction::ScrollLeft => {
@@ -298,8 +284,7 @@ impl App {
                 // Only scroll down if cursor would go BELOW the viewport
                 let viewport_bottom = *self.table_model.table_state.offset_mut() + visible_rows;
                 if new_index >= viewport_bottom {
-                    *self.table_model.table_state.offset_mut() =
-                        new_index.saturating_sub(visible_rows - 1);
+                    *self.table_model.table_state.offset_mut() = new_index.saturating_sub(visible_rows - 1);
                 }
             }
             ResultsTableAction::GoToFirstVertically => {
@@ -308,15 +293,12 @@ impl App {
             }
             ResultsTableAction::GoToLastVertically => {
                 self.table_model.table_state.select(Some(total_rows - 1));
-                *self.table_model.table_state.offset_mut() =
-                    total_rows.saturating_sub(visible_rows);
+                *self.table_model.table_state.offset_mut() = total_rows.saturating_sub(visible_rows);
             }
             ResultsTableAction::YankSelection => {
                 if let Some(row) = self.table_model.get_selected_row_data() {
                     let mut clipboard = Clipboard::new().unwrap();
-                    clipboard
-                        .set_text(serde_json::to_string_pretty(&row).unwrap())
-                        .unwrap();
+                    clipboard.set_text(serde_json::to_string_pretty(&row).unwrap()).unwrap();
                     self.report_message(
                         "Saved current row to clipboard.",
                         MsgKind::Success,
@@ -328,8 +310,7 @@ impl App {
                 self.table_model.horizontal_scroll_offset = 0;
             }
             ResultsTableAction::GoToLastHorizontally => {
-                self.table_model.horizontal_scroll_offset =
-                    self.table_model.query_result.columns.len() - 1;
+                self.table_model.horizontal_scroll_offset = self.table_model.query_result.columns.len() - 1;
             }
         }
     }
@@ -392,9 +373,7 @@ impl App {
                         if driver.next_page(&table_name).await.is_ok() {
                             if let Ok(results) = driver.query(&table_name).await {
                                 if results.rows.len() > 0 {
-                                    if let Ok(current_page) =
-                                        driver.get_current_page(&table_name).await
-                                    {
+                                    if let Ok(current_page) = driver.get_current_page(&table_name).await {
                                         let _ = tx.send(Action::Db(DbAction::NextPageComplete(
                                             table_name,
                                             results,
@@ -428,8 +407,7 @@ impl App {
                         let mut driver = driver.lock().await;
                         if driver.prev_page(&table_name).await.is_ok() {
                             if let Ok(results) = driver.query(&table_name).await {
-                                if let Ok(current_page) = driver.get_current_page(&table_name).await
-                                {
+                                if let Ok(current_page) = driver.get_current_page(&table_name).await {
                                     let _ = tx.send(Action::Db(DbAction::PrevPageComplete(
                                         table_name,
                                         results,
@@ -471,20 +449,15 @@ impl App {
             CommandAction::PopChar => {
                 if self.statusline_model.cmd.cursor > 0 {
                     self.statusline_model.cmd.cursor -= 1;
-                    self.statusline_model
-                        .cmd
-                        .text
-                        .remove(self.statusline_model.cmd.cursor);
+                    self.statusline_model.cmd.text.remove(self.statusline_model.cmd.cursor);
                 }
             }
             CommandAction::MoveLeft => {
-                self.statusline_model.cmd.cursor =
-                    self.statusline_model.cmd.cursor.saturating_sub(1);
+                self.statusline_model.cmd.cursor = self.statusline_model.cmd.cursor.saturating_sub(1);
             }
             CommandAction::MoveRight => {
                 let new_pos = self.statusline_model.cmd.cursor + 1;
-                self.statusline_model.cmd.cursor =
-                    new_pos.min(self.statusline_model.cmd.text.len());
+                self.statusline_model.cmd.cursor = new_pos.min(self.statusline_model.cmd.text.len());
             }
             CommandAction::Execute => {
                 self.evaluate_user_command(&self.statusline_model.cmd.text.clone())

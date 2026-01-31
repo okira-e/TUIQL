@@ -26,12 +26,7 @@ impl TableModel {
         let mut visible_cols = vec![];
         let mut widths = vec![];
         let mut width_so_far = 0;
-        for col in self
-            .query_result
-            .columns
-            .iter()
-            .skip(self.horizontal_scroll_offset)
-        {
+        for col in self.query_result.columns.iter().skip(self.horizontal_scroll_offset) {
             let w: u16 = if col.data_type == "integer" {
                 20
             } else if col.data_type == "text" {

@@ -68,10 +68,7 @@ pub struct StatusLineCommand {
 
 impl Default for StatusLineCommand {
     fn default() -> Self {
-        return Self {
-            text: String::new(),
-            cursor: 0,
-        };
+        return Self { text: String::new(), cursor: 0 };
     }
 }
 

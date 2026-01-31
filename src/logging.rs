@@ -17,14 +17,9 @@ pub fn setup_logging() -> Result<WorkerGuard> {
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     // Set log level based on build mode
-    let default_level = if cfg!(debug_assertions) {
-        "debug"
-    } else {
-        "info"
-    };
+    let default_level = if cfg!(debug_assertions) { "debug" } else { "info" };
 
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_level));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_level));
 
     tracing_subscriber::fmt()
         .with_writer(non_blocking)

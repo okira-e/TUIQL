@@ -82,11 +82,10 @@ impl drivers::DbDriver for PostgresDriver {
     }
 
     async fn get_views(&self) -> Result<Vec<String>> {
-        let rows: Vec<PgRow> = sqlx::query(
-            "SELECT table_name FROM information_schema.views WHERE table_schema = 'public'",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows: Vec<PgRow> =
+            sqlx::query("SELECT table_name FROM information_schema.views WHERE table_schema = 'public'")
+                .fetch_all(&self.pool)
+                .await?;
 
         let views = rows
             .into_iter()
@@ -182,15 +181,9 @@ impl drivers::DbDriver for PostgresDriver {
                         .or_insert_with(Vec::new)
                         .push(cursor_position);
 
-                    Ok(QueryResult {
-                        columns: columns,
-                        rows: out_rows,
-                    })
+                    Ok(QueryResult { columns: columns, rows: out_rows })
                 } else {
-                    Ok(QueryResult {
-                        columns: columns,
-                        rows: vec![],
-                    })
+                    Ok(QueryResult { columns: columns, rows: vec![] })
                 };
             }
             PaginationStrategy::Offset => {
@@ -230,10 +223,7 @@ impl drivers::DbDriver for PostgresDriver {
                 //     }
                 // }
 
-                Ok(QueryResult {
-                    columns: columns,
-                    rows: out_rows,
-                })
+                Ok(QueryResult { columns: columns, rows: out_rows })
             }
         };
     }
@@ -314,8 +304,7 @@ impl drivers::DbDriver for PostgresDriver {
             }
         });
 
-        self.pk_columns_cache
-            .insert(table_name.to_string(), pk_cols.clone());
+        self.pk_columns_cache.insert(table_name.to_string(), pk_cols.clone());
 
         return Ok(pk_cols);
     }
@@ -351,8 +340,7 @@ impl drivers::DbDriver for PostgresDriver {
             .fetch_all(&self.pool)
             .await?;
 
-        self.table_columns_cache
-            .insert(table_name.to_string(), columns.clone());
+        self.table_columns_cache.insert(table_name.to_string(), columns.clone());
 
         Ok(columns)
     }
@@ -433,10 +421,7 @@ impl drivers::DbDriver for PostgresDriver {
             }
             PaginationStrategy::Offset => {
                 let old_offset = self.query_state.offset;
-                let new_offset = self
-                    .query_state
-                    .offset
-                    .saturating_sub(self.query_state.limit);
+                let new_offset = self.query_state.offset.saturating_sub(self.query_state.limit);
 
                 if old_offset != new_offset {
                     self.query_state.offset = new_offset;

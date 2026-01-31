@@ -32,11 +32,6 @@ pub struct ExplorerModel {
 
 impl ExplorerModel {
     pub fn get_items_by_kind(&self, item_type: ExplorerItemKind) -> Vec<ExplorerItem> {
-        return self
-            .items
-            .iter()
-            .filter(|e| e.kind == item_type)
-            .cloned()
-            .collect();
+        return self.items.iter().filter(|e| e.kind == item_type).cloned().collect();
     }
 }

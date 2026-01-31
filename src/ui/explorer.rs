@@ -1,7 +1,6 @@
 use crate::models::explorer::ExplorerItem;
 use crate::models::explorer::ExplorerItemKind;
 use crate::models::explorer::ExplorerModel;
-
 use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Alignment;
@@ -21,13 +20,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::Row;
 use ratatui::widgets::Table;
 
-pub fn render_explorer(
-    model: &mut ExplorerModel,
-    theme: &Theme,
-    frame: &mut Frame,
-    area: Rect,
-    focused: bool,
-) {
+pub fn render_explorer(model: &mut ExplorerModel, theme: &Theme, frame: &mut Frame, area: Rect, focused: bool) {
     let border_style = if focused {
         Style::default().fg(theme.pane_focus)
     } else {
@@ -56,21 +49,9 @@ pub fn render_explorer(
 
     let container = Block::default()
         .title("Database Schema")
-        .title(
-            Line::from("t")
-                .style(table_tab_color)
-                .alignment(Alignment::Right),
-        )
-        .title(
-            Line::from("v")
-                .style(view_tab_color)
-                .alignment(Alignment::Right),
-        )
-        .title(
-            Line::from("m")
-                .style(mview_tab_color)
-                .alignment(Alignment::Right),
-        )
+        .title(Line::from("t").style(table_tab_color).alignment(Alignment::Right))
+        .title(Line::from("v").style(view_tab_color).alignment(Alignment::Right))
+        .title(Line::from("m").style(mview_tab_color).alignment(Alignment::Right))
         .border_style(border_style)
         .borders(Borders::ALL);
 
@@ -137,11 +118,7 @@ pub fn render_explorer(
     let rows: Vec<Row> = items
         .iter()
         .map(|item| {
-            let display_name: String = item
-                .name
-                .chars()
-                .skip(model.horizontal_scroll_offset)
-                .collect();
+            let display_name: String = item.name.chars().skip(model.horizontal_scroll_offset).collect();
             Row::new(vec![Cell::from(display_name).style(theme.fg)])
         })
         .collect();

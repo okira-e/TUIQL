@@ -24,9 +24,7 @@ impl App {
             Some(cmd) => match cmd {
                 Command::Count => {
                     let mut driver = self.db_driver.lock().await;
-                    let message = driver
-                        .query_count(&self.table_model.table_name.clone())
-                        .await?;
+                    let message = driver.query_count(&self.table_model.table_name.clone()).await?;
                     drop(driver);
 
                     self.report_message(
