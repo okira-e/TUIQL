@@ -1,28 +1,25 @@
-use ratatui::layout::Constraint;
-use serde_json::Value;
-
 use crate::drivers::ColumnMetadata;
 use crate::drivers::QueryResult;
+use ratatui::layout::Constraint;
+use ratatui::widgets::TableState;
+use serde_json::Value;
 
 #[derive(Debug, Default)]
 pub struct TableModel {
     pub table_name: String,
     pub query_result: QueryResult,
     pub results_row_count: usize,
-    pub total_row_count: Option<usize>,
     pub current_pos: usize,
-    pub selected_row: Option<usize>,
     /// Dictates how many columns to skip horizontally
     pub horizontal_scroll_offset: usize,
-    /// First visible row in viewport
-    pub vertical_scroll_offset: usize, // Is needed since ratatui's table state sets the offset incorrectly when we initialize it on every render
+    pub table_state: TableState,
 }
 
 impl TableModel {
     pub fn reset(&mut self, selected_row: Option<usize>) {
         self.horizontal_scroll_offset = 0;
-        self.vertical_scroll_offset = 0;
-        self.selected_row = selected_row;
+        *self.table_state.offset_mut() = 0;
+        self.table_state.select(selected_row);
     }
 
     pub fn get_visible_cols(&self, width: u16) -> (Vec<ColumnMetadata>, Vec<Constraint>) {
@@ -65,7 +62,7 @@ impl TableModel {
             return None;
         }
 
-        match self.selected_row {
+        match self.table_state.selected() {
             None => return None,
             Some(pos) => {
                 return Some(self.query_result.rows[pos].clone());

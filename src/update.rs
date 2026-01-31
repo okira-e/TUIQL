@@ -1,7 +1,3 @@
-use arboard::Clipboard;
-use color_eyre::Result;
-use tracing::debug;
-
 use crate::actions::Action;
 use crate::actions::AppAction;
 use crate::actions::CommandAction;
@@ -13,13 +9,15 @@ use crate::app::App;
 use crate::app::Pane;
 use crate::app::RightView;
 use crate::app::View;
-use crate::models::explorer::get_items_by_kind;
-use crate::models::explorer::get_next_item_kind;
-use crate::models::explorer::get_prev_item_kind;
+use crate::models::explorer::ExplorerItemKind;
 use crate::models::statusline::MsgKind;
 use crate::models::statusline::MsgLifetime;
 use crate::models::statusline::StatusLineMode;
 use crate::models::statusline::StatusLineModel;
+use arboard::Clipboard;
+use color_eyre::Result;
+use color_eyre::eyre;
+use tracing::debug;
 
 impl App {
     pub async fn update(&mut self, action: Action) -> Result<()> {
@@ -88,71 +86,139 @@ impl App {
             AppAction::CloseJsonView => {
                 self.right_view = RightView::ResultsTable;
             }
+            AppAction::ReportError(err_report) => {
+                let msg = format!("{}", err_report);
+                self.report_message(msg, MsgKind::Error, MsgLifetime::Long);
+            }
+            AppAction::StopLoading => self.statusline_model.is_loading = false,
         }
 
         return Ok(());
     }
 
     fn update_explorer(&mut self, action: ExplorerAction) {
+        let model = &mut self.explorer_model;
+
         match action {
             ExplorerAction::MoveUp => {
-                let current_index = self.explorer_model.focused_item.clone().unwrap().index;
-
-                if current_index > 0 {
-                    self.explorer_model.focused_item = Some(
-                        get_items_by_kind(
-                            &self.explorer_model.items,
-                            &self.explorer_model.focused_item.clone().unwrap().kind,
-                        )[current_index - 1]
-                            .clone(),
-                    );
-                } else {
-                    let prev_item_type =
-                        get_prev_item_kind(&self.explorer_model.focused_item.clone().unwrap().kind);
-                    let prev_items = get_items_by_kind(&self.explorer_model.items, &prev_item_type);
-
-                    if prev_items.len() > 0 {
-                        self.explorer_model.focused_item =
-                            Some(prev_items[prev_items.len() - 1].clone());
+                let visible_items = match model.selected_tab {
+                    ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
+                    ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
+                    ExplorerItemKind::MaterializedView => {
+                        model.get_items_by_kind(ExplorerItemKind::MaterializedView)
                     }
+                };
+
+                if visible_items.is_empty() {
+                    return;
+                }
+
+                model.table_state.select_previous();
+
+                if let Some(selected) = model.table_state.selected() {
+                    model.focused_item = Some(visible_items[selected].clone());
                 }
             }
             ExplorerAction::MoveDown => {
-                let current_index = self.explorer_model.focused_item.clone().unwrap().index;
-
-                if current_index + 1
-                    < get_items_by_kind(
-                        &self.explorer_model.items,
-                        &self.explorer_model.focused_item.clone().unwrap().kind,
-                    )
-                    .len()
-                {
-                    self.explorer_model.focused_item = Some(
-                        get_items_by_kind(
-                            &self.explorer_model.items,
-                            &self.explorer_model.focused_item.clone().unwrap().kind,
-                        )[current_index + 1]
-                            .clone(),
-                    );
-                } else {
-                    let next_item_type =
-                        get_next_item_kind(&self.explorer_model.focused_item.clone().unwrap().kind);
-
-                    if get_items_by_kind(&self.explorer_model.items, &next_item_type).len() > 0 {
-                        self.explorer_model.focused_item = Some(
-                            get_items_by_kind(&self.explorer_model.items, &next_item_type)[0]
-                                .clone(),
-                        );
+                let visible_items = match model.selected_tab {
+                    ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
+                    ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
+                    ExplorerItemKind::MaterializedView => {
+                        model.get_items_by_kind(ExplorerItemKind::MaterializedView)
                     }
+                };
+
+                if visible_items.is_empty() {
+                    return;
+                }
+
+                let total_rows = visible_items.len();
+                let current = model.table_state.selected().unwrap_or(0);
+                let new_index = if model.table_state.selected().unwrap_or(0) + 1 >= total_rows {
+                    total_rows - 1
+                } else {
+                    current + 1
+                };
+                model.table_state.select(Some(new_index));
+
+                if let Some(selected) = model.table_state.selected() {
+                    model.focused_item = Some(visible_items[selected].clone());
                 }
             }
-            ExplorerAction::ExpandNextItemType => {
-                let current_type = &self.explorer_model.focused_item.clone().unwrap().kind;
-                let next_type = get_next_item_kind(current_type);
+            ExplorerAction::NextTab => {
+                model.selected_tab = match model.selected_tab {
+                    ExplorerItemKind::Table => ExplorerItemKind::View,
+                    ExplorerItemKind::View => ExplorerItemKind::MaterializedView,
+                    ExplorerItemKind::MaterializedView => ExplorerItemKind::Table,
+                };
 
-                if get_items_by_kind(&self.explorer_model.items, &next_type).len() > 0 {
-                    self.explorer_model.focused_item =
-                        Some(get_items_by_kind(&self.explorer_model.items, &next_type)[0].clone());
+                // Reset table state
+                let tab_items = model.get_items_by_kind(model.selected_tab);
+                if tab_items.is_empty() {
+                    model.table_state.select(None);
+                    model.focused_item = None;
+                } else {
+                    model.table_state.select(Some(0));
+                    model.focused_item = Some(tab_items[0].clone());
+                }
+            }
+            ExplorerAction::PrevTab => {
+                model.selected_tab = match model.selected_tab {
+                    ExplorerItemKind::Table => ExplorerItemKind::MaterializedView,
+                    ExplorerItemKind::View => ExplorerItemKind::Table,
+                    ExplorerItemKind::MaterializedView => ExplorerItemKind::View,
+                };
+
+                // Reset table state
+                let tab_items = model.get_items_by_kind(model.selected_tab);
+                if tab_items.is_empty() {
+                    model.table_state.select(None);
+                    model.focused_item = None;
+                } else {
+                    model.table_state.select(Some(0));
+                    model.focused_item = Some(tab_items[0].clone());
+                }
+            }
+            ExplorerAction::GoToFirst => {
+                let visible_items = match model.selected_tab {
+                    ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
+                    ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
+                    ExplorerItemKind::MaterializedView => {
+                        model.get_items_by_kind(ExplorerItemKind::MaterializedView)
+                    }
+                };
+
+                if visible_items.is_empty() {
+                    return;
+                }
+
+                model.table_state.select(Some(0));
+
+                if let Some(selected) = model.table_state.selected() {
+                    model.focused_item = Some(visible_items[selected].clone());
+                }
+            }
+            ExplorerAction::GoToLast => {
+                let visible_items = match model.selected_tab {
+                    ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
+                    ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
+                    ExplorerItemKind::MaterializedView => {
+                        model.get_items_by_kind(ExplorerItemKind::MaterializedView)
+                    }
+                };
+
+                if visible_items.is_empty() {
+                    return;
+                }
+
+                let total_rows = visible_items.len();
+                if total_rows == 0 {
+                    return;
+                }
+                model.table_state.select(Some(total_rows - 1));
+
+                if let Some(selected) = model.table_state.selected() {
+                    model.focused_item = Some(visible_items[selected].clone());
                 }
             }
         }
@@ -164,7 +230,7 @@ impl App {
             return;
         }
 
-        let current = self.table_model.selected_row.unwrap_or(0);
+        let current = self.table_model.table_state.selected().unwrap_or(0);
 
         // Calculate how many rows fit in the viewport
         let table_header_and_footer_height = 5;
@@ -174,11 +240,11 @@ impl App {
         match action {
             ResultsTableAction::MoveUp => {
                 let new_index = if current == 0 { 0 } else { current - 1 };
-                self.table_model.selected_row = Some(new_index);
+                self.table_model.table_state.select(Some(new_index));
 
                 // Only scroll up if cursor would go ABOVE the viewport
-                if new_index < self.table_model.vertical_scroll_offset {
-                    self.table_model.vertical_scroll_offset = new_index;
+                if new_index < *self.table_model.table_state.offset_mut() {
+                    *self.table_model.table_state.offset_mut() = new_index;
                 }
             }
             ResultsTableAction::MoveDown => {
@@ -187,12 +253,12 @@ impl App {
                 } else {
                     current + 1
                 };
-                self.table_model.selected_row = Some(new_index);
+                self.table_model.table_state.select(Some(new_index));
 
                 // Only scroll down if cursor would go BELOW the viewport
-                let viewport_bottom = self.table_model.vertical_scroll_offset + visible_rows;
+                let viewport_bottom = *self.table_model.table_state.offset_mut() + visible_rows;
                 if new_index >= viewport_bottom {
-                    self.table_model.vertical_scroll_offset =
+                    *self.table_model.table_state.offset_mut() =
                         new_index.saturating_sub(visible_rows - 1);
                 }
             }
@@ -215,10 +281,10 @@ impl App {
             ResultsTableAction::JumpUp => {
                 let jump = 10;
                 let new_index = current.saturating_sub(jump);
-                self.table_model.selected_row = Some(new_index);
+                self.table_model.table_state.select(Some(new_index));
                 // Only scroll up if cursor would go ABOVE the viewport
-                if new_index < self.table_model.vertical_scroll_offset {
-                    self.table_model.vertical_scroll_offset = new_index;
+                if new_index < *self.table_model.table_state.offset_mut() {
+                    *self.table_model.table_state.offset_mut() = new_index;
                 }
             }
             ResultsTableAction::JumpDown => {
@@ -227,22 +293,23 @@ impl App {
                 if new_index >= total_rows {
                     new_index = total_rows - 1;
                 }
-                self.table_model.selected_row = Some(new_index);
+                self.table_model.table_state.select(Some(new_index));
 
                 // Only scroll down if cursor would go BELOW the viewport
-                let viewport_bottom = self.table_model.vertical_scroll_offset + visible_rows;
+                let viewport_bottom = *self.table_model.table_state.offset_mut() + visible_rows;
                 if new_index >= viewport_bottom {
-                    self.table_model.vertical_scroll_offset =
+                    *self.table_model.table_state.offset_mut() =
                         new_index.saturating_sub(visible_rows - 1);
                 }
             }
             ResultsTableAction::GoToFirstVertically => {
-                self.table_model.selected_row = Some(0);
-                self.table_model.vertical_scroll_offset = 0;
+                self.table_model.table_state.select(Some(0));
+                *self.table_model.table_state.offset_mut() = 0;
             }
             ResultsTableAction::GoToLastVertically => {
-                self.table_model.selected_row = Some(total_rows - 1);
-                self.table_model.vertical_scroll_offset = total_rows.saturating_sub(visible_rows);
+                self.table_model.table_state.select(Some(total_rows - 1));
+                *self.table_model.table_state.offset_mut() =
+                    total_rows.saturating_sub(visible_rows);
             }
             ResultsTableAction::YankSelection => {
                 if let Some(row) = self.table_model.get_selected_row_data() {
@@ -275,18 +342,26 @@ impl App {
                 // Spawn background task to query
                 let driver = self.db_driver.clone();
                 let tx = self.action_tx.clone();
-                let table_name_clone = table_name.clone();
 
                 tokio::spawn(async move {
-                    let mut driver = driver.lock().await;
-                    if let Ok(results) = driver.query(&table_name_clone).await {
-                        if let Ok(current_page) = driver.get_current_page(&table_name_clone).await {
-                            let _ = tx.send(Action::Db(DbAction::QueryTableComplete(
-                                table_name_clone,
-                                results,
-                                current_page,
-                            )));
-                        }
+                    let res: Result<()> = async {
+                        let mut driver = driver.lock().await;
+                        let results = driver.query(&table_name).await?;
+                        let current_page = driver.get_current_page(&table_name).await?;
+                        let _ = tx.send(Action::Db(DbAction::QueryTableComplete(
+                            table_name,
+                            results,
+                            current_page,
+                        )));
+
+                        eyre::Ok(())
+                    }
+                    .await;
+
+                    let _ = tx.send(Action::App(AppAction::StopLoading));
+
+                    if let Err(err) = res {
+                        let _ = tx.send(Action::App(AppAction::ReportError(err)));
                     }
                 });
             }
@@ -299,12 +374,10 @@ impl App {
                 self.table_model.table_name = table_name.clone();
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
                 self.table_model.current_pos = current_page;
-                self.table_model.selected_row = Some(0);
+                self.table_model.table_state.select(Some(0));
 
                 let msg = format!("Fetched {} rows", rows_fetched);
                 self.report_message(msg, MsgKind::Neutral, MsgLifetime::Short);
-
-                self.statusline_model.is_loading = false;
             }
             DbAction::NextPage => {
                 if let Some(selected_table) = &self.selected_table {

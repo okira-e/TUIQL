@@ -11,7 +11,7 @@ use crate::ui::statusline::render_statusline;
 use crate::ui::table::render_table;
 
 impl App {
-    pub fn render(&self, frame: &mut Frame) {
+    pub fn render(&mut self, frame: &mut Frame) {
         let root = frame.area();
         // Set app-wide background
         let bg = Block::default().style(Style::default().bg(self.theme.bg));
@@ -20,7 +20,7 @@ impl App {
 
         // Render left pane
         render_explorer(
-            &self.explorer_model,
+            &mut self.explorer_model,
             &self.theme,
             frame,
             self.widgets_chunks.explorer_chunk,
@@ -40,7 +40,7 @@ impl App {
             }
             RightView::ResultsTable => {
                 render_table(
-                    &self.table_model,
+                    &mut self.table_model,
                     &self.theme,
                     frame,
                     self.widgets_chunks.table_chunk,

@@ -1,5 +1,8 @@
-use std::collections::HashMap;
-
+use crate::drivers::ColumnMetadata;
+use crate::drivers::PaginationStrategy;
+use crate::drivers::QueryResult;
+use crate::drivers::{self};
+use crate::utils;
 use async_trait::async_trait;
 use color_eyre::Result;
 use dashmap::DashMap;
@@ -7,12 +10,7 @@ use futures::TryStreamExt;
 use sqlx::Postgres;
 use sqlx::Row;
 use sqlx::postgres::PgRow;
-
-use crate::drivers::ColumnMetadata;
-use crate::drivers::PaginationStrategy;
-use crate::drivers::QueryResult;
-use crate::drivers::{self};
-use crate::utils;
+use std::collections::HashMap;
 
 #[derive(Debug, Default, Clone)]
 pub struct QueryState {
@@ -98,6 +96,24 @@ impl drivers::DbDriver for PostgresDriver {
         return Ok(views);
     }
 
+    async fn get_mateialized_views(&self) -> Result<Vec<String>> {
+        let rows: Vec<PgRow> = sqlx::query(
+            "SELECT matviewname AS table_name
+            FROM pg_matviews
+            WHERE schemaname = 'public'
+            ORDER BY matviewname;",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let views = rows
+            .into_iter()
+            .map(|row| row.try_get::<String, _>("table_name").unwrap())
+            .collect();
+
+        return Ok(views);
+    }
+
     async fn query(&mut self, table_name: &str) -> Result<QueryResult> {
         self.query_state.order_by = self.get_order_by_clause(table_name).await?;
 
@@ -126,15 +142,7 @@ impl drivers::DbDriver for PostgresDriver {
 
                 let sql = format!(
                     r#"
-                        SELECT 
-                            to_jsonb(t) AS row
-                        FROM (
-                            SELECT *
-                            FROM {table}
-                            {where_clause}
-                            {order_sql}
-                            LIMIT $2
-                        ) AS t;
+                        SELECT  to_jsonb(t) AS row FROM ( SELECT * FROM {table} {where_clause} {order_sql} LIMIT $2 ) AS t;
                     "#,
                     table = ident,
                     where_clause = where_clause,
@@ -211,6 +219,16 @@ impl drivers::DbDriver for PostgresDriver {
                 while let Some(j) = stream.try_next().await? {
                     out_rows.push(j);
                 }
+                // match stream.try_next().await {
+                //     Ok(next) => {
+                //         while let Some(j) = &next {
+                //             out_rows.push(j.clone());
+                //         }
+                //     }
+                //     Err(err) => {
+                //         panic!("{}", err);
+                //     }
+                // }
 
                 Ok(QueryResult {
                     columns: columns,
@@ -310,13 +328,18 @@ impl drivers::DbDriver for PostgresDriver {
 
         let sql = r#"
             SELECT
-                column_name,
-                data_type,
-                is_nullable
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = $1
-            ORDER BY ordinal_position;
+                a.attname              AS column_name,
+                pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
+                NOT a.attnotnull       AS is_nullable
+            FROM pg_catalog.pg_attribute a
+            JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE
+                n.nspname = 'public'
+                AND c.relname = $1
+                AND a.attnum > 0
+                AND NOT a.attisdropped
+            ORDER BY a.attnum;
         "#;
 
         let columns = sqlx::query(sql)
@@ -324,10 +347,6 @@ impl drivers::DbDriver for PostgresDriver {
             .map(|row: PgRow| ColumnMetadata {
                 name: row.get("column_name"),
                 data_type: row.get("data_type"),
-                is_nullable: match row.get::<String, _>("is_nullable").as_str() {
-                    "YES" => true,
-                    _ => false,
-                },
             })
             .fetch_all(&self.pool)
             .await?;

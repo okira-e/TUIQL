@@ -5,54 +5,38 @@ pub struct ExplorerItem {
     pub index: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExplorerItemKind {
     Table,
     View,
+    MaterializedView,
 }
 
-impl ExplorerItemKind {
-    pub fn label(&self) -> &'static str {
-        match self {
-            Self::Table => "Tables",
-            Self::View => "Views",
-        }
-    }
-
-    pub fn arrow(&self, focused: bool) -> &'static str {
-        if focused { "▼" } else { "▶" }
+impl Default for ExplorerItemKind {
+    fn default() -> Self {
+        return Self::Table;
     }
 }
 
 #[derive(Debug, Default)]
 pub struct ExplorerModel {
-    /// The item under the cursor.
+    /// The item under the cursor
     pub focused_item: Option<ExplorerItem>,
-    /// All items in the tree.
+    /// All fetched tables/views
     pub items: Vec<ExplorerItem>,
+    pub table_state: ratatui::widgets::TableState,
+    pub selected_tab: ExplorerItemKind,
+    /// Horizontal scroll offset for long item names
+    pub horizontal_scroll_offset: usize,
 }
 
-pub fn get_items_by_kind(
-    items: &Vec<ExplorerItem>,
-    item_type: &ExplorerItemKind,
-) -> Vec<ExplorerItem> {
-    return items
-        .iter()
-        .filter(|e| e.kind == *item_type)
-        .cloned()
-        .collect();
-}
-
-pub fn get_next_item_kind(current_type: &ExplorerItemKind) -> ExplorerItemKind {
-    return match current_type {
-        ExplorerItemKind::Table => ExplorerItemKind::View,
-        ExplorerItemKind::View => ExplorerItemKind::Table,
-    };
-}
-
-pub fn get_prev_item_kind(current_type: &ExplorerItemKind) -> ExplorerItemKind {
-    return match current_type {
-        ExplorerItemKind::Table => ExplorerItemKind::View,
-        ExplorerItemKind::View => ExplorerItemKind::Table,
-    };
+impl ExplorerModel {
+    pub fn get_items_by_kind(&self, item_type: ExplorerItemKind) -> Vec<ExplorerItem> {
+        return self
+            .items
+            .iter()
+            .filter(|e| e.kind == item_type)
+            .cloned()
+            .collect();
+    }
 }

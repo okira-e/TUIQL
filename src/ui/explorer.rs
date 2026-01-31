@@ -1,23 +1,28 @@
+use crate::models::explorer::ExplorerItem;
+use crate::models::explorer::ExplorerItemKind;
+use crate::models::explorer::ExplorerModel;
+
+use crate::theme::Theme;
 use ratatui::Frame;
+use ratatui::layout::Alignment;
 use ratatui::layout::Constraint;
 use ratatui::layout::Direction;
 use ratatui::layout::Layout;
 use ratatui::layout::Rect;
+use ratatui::style::Modifier;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
+use ratatui::widgets::Cell;
+use ratatui::widgets::Padding;
 use ratatui::widgets::Paragraph;
-
-use crate::models::explorer::ExplorerItem;
-use crate::models::explorer::ExplorerItemKind;
-use crate::models::explorer::ExplorerModel;
-use crate::models::explorer::get_items_by_kind;
-use crate::theme::Theme;
+use ratatui::widgets::Row;
+use ratatui::widgets::Table;
 
 pub fn render_explorer(
-    model: &ExplorerModel,
+    model: &mut ExplorerModel,
     theme: &Theme,
     frame: &mut Frame,
     area: Rect,
@@ -29,109 +34,126 @@ pub fn render_explorer(
         Style::default().bg(theme.bg)
     };
 
-    let container = Block::default()
-        .title("Database Schema")
-        .border_style(border_style)
-        .borders(Borders::ALL);
-
-    frame.render_widget(&container, area);
-    let inner = container.inner(area);
-
-    if model.items.is_empty() {
-        frame.render_widget(Paragraph::new("\n\nDatabase is empty").centered(), inner);
-        return;
-    }
-
-    let focused_item = model.focused_item.as_ref();
-
-    let tables = get_items_by_kind(&model.items, &ExplorerItemKind::Table);
-    let views = get_items_by_kind(&model.items, &ExplorerItemKind::View);
-
-    let mut constraints = Vec::new();
-
-    // Tables section
-    constraints.push(Constraint::Length(1)); // Header
-    if focused_item.is_some_and(|f| f.kind == ExplorerItemKind::Table) {
-        constraints.push(Constraint::Length(tables.len() as u16));
-    }
-
-    // Views section
-    constraints.push(Constraint::Length(1)); // Header
-    if focused_item.is_some_and(|f| f.kind == ExplorerItemKind::View) {
-        constraints.push(Constraint::Length(views.len() as u16));
-    }
-
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(constraints)
-        .split(inner);
-
-    let mut idx = 0;
-
     //
-    // Tables
+    // Draw the container
     //
-    frame.render_widget(
-        section_title(ExplorerItemKind::Table, focused_item, theme),
-        layout[idx],
-    );
-    idx += 1;
 
-    if focused_item.is_some_and(|f| f.kind == ExplorerItemKind::Table) {
-        let lines = tables
-            .iter()
-            .map(|item| explorer_line(item, focused_item, focused, theme));
-
-        frame.render_widget(Paragraph::new(lines.collect::<Vec<_>>()), layout[idx]);
-        idx += 1;
-    }
-
-    //
-    // Views
-    //
-    frame.render_widget(
-        section_title(ExplorerItemKind::View, focused_item, theme),
-        layout[idx],
-    );
-    idx += 1;
-
-    if focused_item.is_some_and(|f| f.kind == ExplorerItemKind::View) {
-        let lines = views
-            .iter()
-            .map(|item| explorer_line(item, focused_item, focused, theme));
-
-        frame.render_widget(Paragraph::new(lines.collect::<Vec<_>>()), layout[idx]);
-    }
-}
-
-fn section_title(
-    kind: ExplorerItemKind,
-    focused_item: Option<&ExplorerItem>,
-    theme: &Theme,
-) -> Line<'static> {
-    let focused = focused_item.is_some_and(|f| f.kind == kind);
-
-    Line::from(format!("{} {}", kind.arrow(focused), kind.label()))
-        .style(theme.fg)
-        .bold()
-}
-
-fn explorer_line(
-    item: &ExplorerItem,
-    focused_item: Option<&ExplorerItem>,
-    pane_focused: bool,
-    theme: &Theme,
-) -> Line<'static> {
-    let selected = focused_item.is_some_and(|f| f.name == item.name && f.kind == item.kind);
-
-    let prefix = if selected { "  > " } else { "    " };
-    let content = format!("{prefix}{}", item.name);
-
-    let style = if selected && pane_focused {
+    let table_tab_color = if model.selected_tab == ExplorerItemKind::Table {
+        theme.selection
+    } else {
+        theme.fg
+    };
+    let view_tab_color = if model.selected_tab == ExplorerItemKind::View {
+        theme.selection
+    } else {
+        theme.fg
+    };
+    let mview_tab_color = if model.selected_tab == ExplorerItemKind::MaterializedView {
         theme.selection
     } else {
         theme.fg
     };
 
-    Line::from(content).style(style)
+    let container = Block::default()
+        .title("Database Schema")
+        .title(
+            Line::from("t")
+                .style(table_tab_color)
+                .alignment(Alignment::Right),
+        )
+        .title(
+            Line::from("v")
+                .style(view_tab_color)
+                .alignment(Alignment::Right),
+        )
+        .title(
+            Line::from("m")
+                .style(mview_tab_color)
+                .alignment(Alignment::Right),
+        )
+        .border_style(border_style)
+        .borders(Borders::ALL);
+
+    frame.render_widget(&container, area);
+    let inner_container = container.inner(area);
+
+    if model.items.is_empty() {
+        frame.render_widget(
+            Paragraph::new("\n\nDatabase is empty").centered(),
+            inner_container,
+        );
+        return;
+    }
+
+    let areas = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // title
+            Constraint::Min(0),    // items list
+        ])
+        .split(inner_container);
+
+    let title_area = areas[0];
+    let items_list_area = areas[1];
+
+    //
+    // Draw tab title
+    //
+
+    let tab_title = match model.selected_tab {
+        ExplorerItemKind::Table => "Tables",
+        ExplorerItemKind::View => "Views",
+        ExplorerItemKind::MaterializedView => "Materialized Views",
+    };
+
+    let p = Paragraph::new(tab_title)
+        .style(theme.fg)
+        .block(Block::default().padding(Padding::left(1)))
+        .add_modifier(Modifier::BOLD);
+    frame.render_widget(p, title_area);
+
+    //
+    // Draw the items table
+    //
+
+    // Get items for current tab (MaterializedView uses View data for now)
+    let items: Vec<ExplorerItem> = match model.selected_tab {
+        ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
+        ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
+        ExplorerItemKind::MaterializedView => model.get_items_by_kind(ExplorerItemKind::MaterializedView),
+    };
+
+    if items.is_empty() {
+        let empty_msg = match model.selected_tab {
+            ExplorerItemKind::Table => "No tables",
+            ExplorerItemKind::View => "No views",
+            ExplorerItemKind::MaterializedView => "No materialized views",
+        };
+        frame.render_widget(Paragraph::new(empty_msg).centered(), items_list_area);
+        return;
+    }
+
+    // Build rows with horizontal scroll offset applied
+    let rows: Vec<Row> = items
+        .iter()
+        .map(|item| {
+            let display_name: String = item
+                .name
+                .chars()
+                .skip(model.horizontal_scroll_offset)
+                .collect();
+            Row::new(vec![Cell::from(display_name).style(theme.fg)])
+        })
+        .collect();
+
+    let table = Table::new(rows, [Constraint::Percentage(100)])
+        .row_highlight_style(if focused {
+            Style::default().fg(theme.selection)
+        } else {
+            Style::default()
+        })
+        .block(Block::default().padding(Padding::left(1)))
+        .highlight_symbol("> ");
+
+    frame.render_stateful_widget(table, items_list_area, &mut model.table_state);
 }

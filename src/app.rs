@@ -1,15 +1,3 @@
-use std::sync::Arc;
-
-use color_eyre::Result;
-use crossterm::event::EventStream;
-use ratatui::DefaultTerminal;
-use ratatui::layout::Constraint;
-use ratatui::layout::Direction;
-use ratatui::layout::Layout;
-use ratatui::layout::Rect;
-use tokio::sync::Mutex;
-use tokio::sync::mpsc;
-
 use crate::actions::Action;
 use crate::config::Settings;
 use crate::drivers::DbDriver;
@@ -26,6 +14,16 @@ use crate::models::statusline::StatusLineMsg;
 use crate::models::table::TableModel;
 use crate::theme::Flavor;
 use crate::theme::Theme;
+use color_eyre::Result;
+use crossterm::event::EventStream;
+use ratatui::DefaultTerminal;
+use ratatui::layout::Constraint;
+use ratatui::layout::Direction;
+use ratatui::layout::Layout;
+use ratatui::layout::Rect;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio::sync::mpsc;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum View {
@@ -102,10 +100,17 @@ impl App {
 
     pub async fn init(&mut self) -> Result<()> {
         // Populate the explorer state.
+        self.populate_explorer_state().await?;
+
+        return Ok(());
+    }
+
+    async fn populate_explorer_state(&mut self) -> Result<()> {
         let driver = self.db_driver.lock().await;
         let tables: Vec<String> = driver.get_tables().await?;
         let views: Vec<String> = driver.get_views().await?;
-        drop(driver);
+        let materizlied: Vec<String> = driver.get_mateialized_views().await?;
+        drop(driver); // unlock the mutex
 
         let tables: Vec<ExplorerItem> = tables
             .iter()
@@ -127,9 +132,27 @@ impl App {
             })
             .collect();
 
-        let items: Vec<_> = tables.into_iter().chain(views).collect();
+        let materialized: Vec<ExplorerItem> = materizlied
+            .iter()
+            .enumerate()
+            .map(|(i, name)| ExplorerItem {
+                name: name.clone(),
+                kind: ExplorerItemKind::MaterializedView,
+                index: i,
+            })
+            .collect();
+
+        let items: Vec<_> = tables
+            .into_iter()
+            .chain(views)
+            .chain(materialized)
+            .collect();
+
         self.explorer_model.items = items;
-        self.explorer_model.focused_item = Some(self.explorer_model.items[0].clone());
+        if !self.explorer_model.items.is_empty() {
+            self.explorer_model.focused_item = Some(self.explorer_model.items[0].clone());
+            self.explorer_model.table_state.select(Some(0));
+        }
 
         return Ok(());
     }

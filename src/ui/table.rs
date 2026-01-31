@@ -1,3 +1,5 @@
+use crate::models::table::TableModel;
+use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Alignment;
 use ratatui::layout::Constraint;
@@ -15,14 +17,10 @@ use ratatui::widgets::Cell;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Row;
 use ratatui::widgets::Table;
-use ratatui::widgets::TableState;
 use serde_json::Value;
 
-use crate::models::table::TableModel;
-use crate::theme::Theme;
-
 pub fn render_table(
-    model: &TableModel,
+    model: &mut TableModel,
     theme: &Theme,
     frame: &mut Frame,
     area: Rect,
@@ -126,9 +124,7 @@ pub fn render_table(
         .widths(widths)
         .highlight_symbol("> ");
 
-    let mut ratatui_table_state = TableState::default().with_offset(model.vertical_scroll_offset);
-    ratatui_table_state.select(model.selected_row);
-    frame.render_stateful_widget(table, table_area, &mut ratatui_table_state);
+    frame.render_stateful_widget(table, table_area, &mut model.table_state);
 
     //
     // Render the horizontal scrollbar

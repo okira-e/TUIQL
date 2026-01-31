@@ -1,14 +1,3 @@
-use std::time::Duration;
-
-use color_eyre::Result;
-use crossterm::event::Event;
-use crossterm::event::KeyCode;
-use crossterm::event::KeyEvent;
-use crossterm::event::KeyEventKind;
-use crossterm::event::KeyModifiers;
-use futures::FutureExt;
-use futures::StreamExt;
-
 use crate::actions::Action;
 use crate::actions::AppAction;
 use crate::actions::CommandAction;
@@ -18,6 +7,15 @@ use crate::actions::JsonViewAction;
 use crate::actions::ResultsTableAction;
 use crate::app::App;
 use crate::app::View;
+use color_eyre::Result;
+use crossterm::event::Event;
+use crossterm::event::KeyCode;
+use crossterm::event::KeyEvent;
+use crossterm::event::KeyEventKind;
+use crossterm::event::KeyModifiers;
+use futures::FutureExt;
+use futures::StreamExt;
+use std::time::Duration;
 
 impl App {
     /// Handles all events, both from crossterm and internal async actions.
@@ -164,8 +162,26 @@ impl App {
                     return Ok(());
                 }
 
-                (_, KeyCode::Char('h') | KeyCode::Left) => {
-                    self.update(Action::Explorer(ExplorerAction::ExpandNextItemType))
+                (_, KeyCode::Char(']')) => {
+                    self.update(Action::Explorer(ExplorerAction::NextTab))
+                        .await?;
+                    return Ok(());
+                }
+
+                (_, KeyCode::Char('[')) => {
+                    self.update(Action::Explorer(ExplorerAction::PrevTab))
+                        .await?;
+                    return Ok(());
+                }
+
+                (_, KeyCode::Char('g')) => {
+                    self.update(Action::Explorer(ExplorerAction::GoToFirst))
+                        .await?;
+                    return Ok(());
+                }
+
+                (_, KeyCode::Char('G')) => {
+                    self.update(Action::Explorer(ExplorerAction::GoToLast))
                         .await?;
                     return Ok(());
                 }
@@ -229,8 +245,7 @@ impl App {
                 }
 
                 (_, KeyCode::Esc) => {
-                    self.update(Action::App(AppAction::CloseJsonView))
-                        .await?;
+                    self.update(Action::App(AppAction::CloseJsonView)).await?;
                     return Ok(());
                 }
 

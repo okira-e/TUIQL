@@ -1,6 +1,7 @@
 use crate::drivers::QueryResult;
+use color_eyre::eyre;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Action {
     App(AppAction),
     Explorer(ExplorerAction),
@@ -11,7 +12,7 @@ pub enum Action {
     None,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum AppAction {
     Quit,
     Tick,
@@ -21,13 +22,18 @@ pub enum AppAction {
     ViewSelectedRowAsJson,
     CloseJsonView,
     SetCommandMode,
+    ReportError(eyre::Report),
+    StopLoading,
 }
 
 #[derive(Debug, Clone)]
 pub enum ExplorerAction {
     MoveUp,
     MoveDown,
-    ExpandNextItemType,
+    NextTab,
+    PrevTab,
+    GoToFirst,
+    GoToLast,
 }
 
 #[derive(Debug, Clone)]

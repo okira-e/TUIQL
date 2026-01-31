@@ -15,6 +15,7 @@ use crate::drivers::postgres::PostgresDriver;
 pub trait DbDriver: Send + Sync {
     async fn get_tables(&self) -> Result<Vec<String>>;
     async fn get_views(&self) -> Result<Vec<String>>;
+    async fn get_mateialized_views(&self) -> Result<Vec<String>>;
     async fn query(&mut self, table_name: &str) -> Result<QueryResult>;
     async fn query_count(&mut self, table_name: &str) -> Result<usize>;
     async fn get_order_by_clause(&mut self, table_name: &str) -> Result<String>;
@@ -51,7 +52,6 @@ pub struct QueryResult {
 pub struct ColumnMetadata {
     pub name: String,
     pub data_type: String,
-    pub is_nullable: bool,
 }
 
 #[derive(Debug, Clone)]
