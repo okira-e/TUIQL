@@ -1,19 +1,18 @@
-use std::path::PathBuf;
-
+use crate::drivers::kinds::DbKind;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-use crate::drivers::kinds::DbKinds;
+use std::fs::File;
+use std::path::PathBuf;
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {}
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Connection {
     pub name: String,
-    pub kind: DbKinds,
+    pub kind: DbKind,
     pub url: String,
 }
 
@@ -58,6 +57,42 @@ pub fn load_connections() -> Result<Vec<Connection>> {
     };
 
     return Ok(connections);
+}
+
+pub fn add_connection(conn: Connection) -> Result<()> {
+    let config_path = match get_config_dir_path_based_on_os()? {
+        Some(path) => path,
+        None => bail!("Unable to get config dir"),
+    };
+
+    let connections_file_path = config_path.join("connections.json");
+    if !connections_file_path.exists() {
+        bail!("Connection file does not exist"); // Shouldn't happen.
+    }
+
+    let connections_file = match File::open(connections_file_path) {
+        Ok(val) => val,
+        Err(err) => bail!("Failed to open connection file: {}", err),
+    };
+
+    let mut connections: Vec<Connection> = match serde_json::from_reader(connections_file) {
+        Ok(val) => val,
+        Err(err) => bail!("Failed to parse connection file: {}", err),
+    };
+
+    connections.push(conn);
+
+    let connections_file = match File::create(config_path.join("connections.json")) {
+        Ok(val) => val,
+        Err(err) => bail!("Failed to open connection file: {}", err),
+    };
+
+    match serde_json::to_writer_pretty(connections_file, &connections) {
+        Ok(_) => {}
+        Err(err) => bail!("Failed to write connection file: {}", err),
+    };
+
+    return Ok(());
 }
 
 /// Get the config file path based on the OS. It returns the path to the directory

@@ -1,14 +1,28 @@
 pub mod args;
-pub mod commands;
 use crate::app::App;
-use crate::cli::commands::Commands;
+use crate::cli::args::ConnectCmdArgs;
+use crate::cli::args::OpenCmdArgs;
+use crate::cli::args::SaveConnectionCmdArgs;
 use crate::config;
 use crate::drivers;
+use clap::Subcommand;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
 use tabled::Table;
 use tabled::Tabled;
 use url::Url;
+
+#[derive(Debug, Subcommand)]
+pub enum Commands {
+    /// Connect to a database directly without saving it.
+    Connect(ConnectCmdArgs),
+    /// Open a saved connection to a database.
+    Open(OpenCmdArgs),
+    /// List all saved connections.
+    ListConnections,
+    ///  Save a new database connection.
+    AddConnection(SaveConnectionCmdArgs),
+}
 
 pub async fn run(args: args::AppArgs) -> Result<()> {
     if args.config_path {
@@ -38,14 +52,15 @@ pub async fn run(args: args::AppArgs) -> Result<()> {
 async fn exec_command(command: Commands) -> Result<()> {
     return match command {
         Commands::Connect(args) => connect_directly(args).await,
-        Commands::Open(args) => open_connection(&args.connection_name).await,
+        Commands::Open(args) => open_connection(args).await,
         Commands::ListConnections => list_connections(),
+        Commands::AddConnection(args) => save_connection(args).await,
     };
 }
 
 /// Connect to the database directly without saving/opening a project.
 async fn connect_directly(args: args::ConnectCmdArgs) -> Result<()> {
-    let db_driver = drivers::new_connection(&args.r#type, &args.url).await?;
+    let db_driver = drivers::new_connection(args.r#type, &args.url).await?;
 
     let settings = config::load_settings()?;
 
@@ -60,10 +75,10 @@ async fn connect_directly(args: args::ConnectCmdArgs) -> Result<()> {
 }
 
 /// Opens a previously saved database connection.
-async fn open_connection(connection_name: &str) -> Result<()> {
+async fn open_connection(args: args::OpenCmdArgs) -> Result<()> {
     let connections = config::load_connections()?;
 
-    let connection = match connections.iter().find(|c| c.name == connection_name) {
+    let connection = match connections.iter().find(|c| c.name == args.connection_name) {
         Some(c) => c,
         None => {
             bail!(
@@ -73,7 +88,7 @@ async fn open_connection(connection_name: &str) -> Result<()> {
         }
     };
 
-    let db_driver = drivers::new_connection(&connection.kind, &connection.url).await?;
+    let db_driver = drivers::new_connection(connection.kind, &connection.url).await?;
 
     let settings = config::load_settings()?;
     let mut app = App::new(settings, db_driver).await;
@@ -84,6 +99,33 @@ async fn open_connection(connection_name: &str) -> Result<()> {
     ratatui::restore();
 
     return result;
+}
+
+async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
+    drivers::ping_connection(
+        args.r#type,
+        &args.host,
+        args.port,
+        &args.user,
+        &args.pass,
+        &args.db_name,
+    )
+    .await?;
+
+    let conn = config::Connection {
+        name: args.connection_name,
+        kind: args.r#type,
+        url: format!(
+            "postgres://{}:{}@{}:{}/{}",
+            args.user, args.pass, args.host, args.port, args.db_name
+        ),
+    };
+
+    config::add_connection(conn)?;
+
+    list_connections()?;
+
+    return Ok(());
 }
 
 fn list_connections() -> Result<()> {

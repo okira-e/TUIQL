@@ -62,6 +62,21 @@ impl PostgresDriver {
             query_state: QueryState::new(),
         });
     }
+
+    pub async fn ping(host: &str, port: u16, user: &str, password: &str, db_name: &str) -> Result<()> {
+        let temp_pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .acquire_timeout(std::time::Duration::from_secs(3))
+            .connect(&format!(
+                "postgres://{}:{}@{}:{}/{}",
+                user, password, host, port, db_name
+            ))
+            .await?;
+
+        sqlx::query("SELECT 1").fetch_one(&temp_pool).await?;
+
+        return Ok(());
+    }
 }
 
 #[async_trait]

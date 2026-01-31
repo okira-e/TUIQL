@@ -8,7 +8,7 @@ use std::fmt;
 use async_trait::async_trait;
 use color_eyre::Result;
 
-use crate::drivers::kinds::DbKinds;
+use crate::drivers::kinds::DbKind;
 use crate::drivers::postgres::PostgresDriver;
 
 #[async_trait]
@@ -28,18 +28,39 @@ pub trait DbDriver: Send + Sync {
     async fn get_current_page(&self, table_name: &str) -> Result<usize>;
 }
 
-pub async fn new_connection(kind: &DbKinds, url: &str) -> Result<Box<dyn DbDriver>> {
+pub async fn new_connection(kind: DbKind, url: &str) -> Result<Box<dyn DbDriver>> {
     return match kind {
-        DbKinds::MySQL | DbKinds::Mariadb => {
+        DbKind::MySQL | DbKind::Mariadb => {
             // Ok(Arc::new(MySqlDriver::new_pool(url).await?))
             todo!()
         }
-        DbKinds::Postgres => Ok(Box::new(PostgresDriver::new_pool(url).await?)),
-        DbKinds::SQLite => {
+        DbKind::Postgres => Ok(Box::new(PostgresDriver::new_pool(url).await?)),
+        DbKind::SQLite => {
             // Ok(Arc::new(SqliteDriver::new_pool(url).await?))
             todo!()
         }
     };
+}
+
+pub async fn ping_connection(
+    kind: DbKind,
+    host: &str,
+    port: u16,
+    user: &str,
+    password: &str,
+    db_name: &str,
+) -> Result<()> {
+    match kind {
+        DbKind::MySQL | DbKind::Mariadb => {
+            // MySqlDriver::ping().await
+            todo!()
+        }
+        DbKind::Postgres => PostgresDriver::ping(host, port, user, password, db_name).await,
+        DbKind::SQLite => {
+            // SqliteDriver::ping().await
+            todo!()
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
