@@ -1,4 +1,13 @@
 /target
-.idea
-.vscode
-.DS_Store
+
+.idea/
+.vscode/
+.zed
+*.sublime-workspace
+
+**/.DS_Store
+
+todo.txt
+
+.claude
+
