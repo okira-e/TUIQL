@@ -227,16 +227,6 @@ impl drivers::DbDriver for PostgresDriver {
                 while let Some(j) = stream.try_next().await? {
                     out_rows.push(j);
                 }
-                // match stream.try_next().await {
-                //     Ok(next) => {
-                //         while let Some(j) = &next {
-                //             out_rows.push(j.clone());
-                //         }
-                //     }
-                //     Err(err) => {
-                //         panic!("{}", err);
-                //     }
-                // }
 
                 Ok(QueryResult { columns: columns, rows: out_rows })
             }
@@ -410,20 +400,36 @@ impl drivers::DbDriver for PostgresDriver {
         return Ok(ret);
     }
 
-    /// Modifies the state so the next fetch returns the next page.
-    /// Returns if the state is new and fetching will yield newer results.
-    async fn next_page(&mut self, table: &str) -> Result<()> {
+    /// Attempts to fetch the next page. Only commits the new offset if data exists.
+    /// Returns `Some(result)` if there's data, `None` if we're at the end.
+    async fn next_page(&mut self, table: &str) -> Result<Option<QueryResult>> {
         match self.get_pagination_strategy(table).await? {
             PaginationStrategy::Cursor(_) => {
-                // nothing — cursor advanced when fetching
+                // Cursor is advanced inside query() when data is fetched.
+                // Just run the query and return the result.
+                let result = self.query(table).await?;
+                if result.rows.is_empty() {
+                    return Ok(None);
+                }
+                return Ok(Some(result));
             }
             PaginationStrategy::Offset => {
-                let new_offset = self.query_state.offset + self.query_state.limit;
+                let old_offset = self.query_state.offset;
+                let new_offset = old_offset + self.query_state.limit;
+
+                // Speculatively set the new offset
                 self.query_state.offset = new_offset;
+                let result = self.query(table).await?;
+
+                if result.rows.is_empty() {
+                    // No data at new offset, revert
+                    self.query_state.offset = old_offset;
+                    return Ok(None);
+                }
+
+                return Ok(Some(result));
             }
         }
-
-        return Ok(());
     }
 
     async fn prev_page(&mut self, table_name: &str) -> Result<()> {

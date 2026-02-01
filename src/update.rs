@@ -21,7 +21,9 @@ use tracing::debug;
 
 impl App {
     pub async fn update(&mut self, action: Action) -> Result<()> {
-        debug!("Received action: {:?}", action);
+        if !matches!(action, Action::App(AppAction::Tick)) {
+            debug!("Received action: {:?}", action);
+        }
 
         match action {
             Action::App(action) => self.update_app(action).await?,
@@ -369,19 +371,25 @@ impl App {
                     let table_name = selected_table.clone();
 
                     tokio::spawn(async move {
-                        let mut driver = driver.lock().await;
-                        if driver.next_page(&table_name).await.is_ok() {
-                            if let Ok(results) = driver.query(&table_name).await {
-                                if results.rows.len() > 0 {
-                                    if let Ok(current_page) = driver.get_current_page(&table_name).await {
-                                        let _ = tx.send(Action::Db(DbAction::NextPageComplete(
-                                            table_name,
-                                            results,
-                                            current_page,
-                                        )));
-                                    }
-                                }
+                        let res: Result<()> = async {
+                            let mut driver = driver.lock().await;
+                            if let Some(results) = driver.next_page(&table_name).await? {
+                                let current_page = driver.get_current_page(&table_name).await?;
+                                let _ = tx.send(Action::Db(DbAction::NextPageComplete(
+                                    table_name,
+                                    results,
+                                    current_page,
+                                )));
                             }
+
+                            eyre::Ok(())
+                        }
+                        .await;
+
+                        let _ = tx.send(Action::App(AppAction::StopLoading));
+
+                        if let Err(err) = res {
+                            let _ = tx.send(Action::App(AppAction::ReportError(err)));
                         }
                     });
                 }
@@ -404,17 +412,25 @@ impl App {
                     let table_name = selected_table.clone();
 
                     tokio::spawn(async move {
-                        let mut driver = driver.lock().await;
-                        if driver.prev_page(&table_name).await.is_ok() {
-                            if let Ok(results) = driver.query(&table_name).await {
-                                if let Ok(current_page) = driver.get_current_page(&table_name).await {
-                                    let _ = tx.send(Action::Db(DbAction::PrevPageComplete(
-                                        table_name,
-                                        results,
-                                        current_page,
-                                    )));
-                                }
-                            }
+                        let res: Result<()> = async {
+                            let mut driver = driver.lock().await;
+                            driver.prev_page(&table_name).await?;
+                            let results = driver.query(&table_name).await?;
+                            let current_page = driver.get_current_page(&table_name).await?;
+                            let _ = tx.send(Action::Db(DbAction::PrevPageComplete(
+                                table_name,
+                                results,
+                                current_page,
+                            )));
+
+                            eyre::Ok(())
+                        }
+                        .await;
+
+                        let _ = tx.send(Action::App(AppAction::StopLoading));
+
+                        if let Err(err) = res {
+                            let _ = tx.send(Action::App(AppAction::ReportError(err)));
                         }
                     });
                 }
