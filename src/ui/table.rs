@@ -26,7 +26,7 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
         Style::default().bg(theme.bg)
     };
 
-    let row_status = format!("{}/{}", model.current_pos, model.results_row_count,);
+    let row_count = model.results_row_count;
 
     let container_block = Block::default()
         .title("Query Result".to_string())
@@ -36,9 +36,13 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
                 .alignment(Alignment::Right),
         )
         .title_bottom(
-            Line::from(row_status.clone())
-                .style(theme.fg)
-                .alignment(Alignment::Center),
+            Line::from(format!(
+                "Page {} - Count {}",
+                model.current_page + 1,
+                row_count
+            ))
+            .style(theme.fg)
+            .alignment(Alignment::Center),
         )
         .border_style(container_border_style)
         .borders(Borders::ALL);
@@ -53,12 +57,11 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
     let table_area = inner_layout[0];
     let horizontal_scroll_bar_area = inner_layout[1];
 
-    // Early exit if no result or empty
-    let no_results_message = Paragraph::new("No results to display")
-        .style(theme.fg)
-        .block(container_block.clone());
-
     if model.query_result.rows.is_empty() {
+        let no_results_message = Paragraph::new("No results to display")
+            .style(theme.fg)
+            .block(container_block.clone());
+
         frame.render_widget(no_results_message, area);
         return;
     }

@@ -13,6 +13,7 @@ pub struct TableModel {
     /// Dictates how many columns to skip horizontally
     pub horizontal_scroll_offset: usize,
     pub table_state: TableState,
+    pub current_page: usize,
 }
 
 impl TableModel {

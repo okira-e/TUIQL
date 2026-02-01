@@ -56,9 +56,9 @@ pub enum DbAction {
     QueryTable(String),
     QueryTableComplete(String, QueryResult, usize),
     NextPage,
-    NextPageComplete(String, QueryResult, usize),
+    NextPageComplete(String, QueryResult, usize, usize),
     PrevPage,
-    PrevPageComplete(String, QueryResult, usize),
+    PrevPageComplete(String, QueryResult, usize, usize),
 }
 
 #[derive(Debug, Clone)]

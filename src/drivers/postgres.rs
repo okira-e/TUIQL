@@ -44,6 +44,7 @@ pub struct PostgresDriver {
     pk_columns_cache: DashMap<String, Vec<String>>,
     table_columns_cache: DashMap<String, Vec<ColumnMetadata>>,
     query_state: QueryState,
+    pub current_page: usize,
 }
 
 impl PostgresDriver {
@@ -60,6 +61,7 @@ impl PostgresDriver {
             pk_columns_cache: DashMap::new(),
             table_columns_cache: DashMap::new(),
             query_state: QueryState::new(),
+            current_page: 0,
         });
     }
 
@@ -403,7 +405,7 @@ impl drivers::DbDriver for PostgresDriver {
     /// Attempts to fetch the next page. Only commits the new offset if data exists.
     /// Returns `Some(result)` if there's data, `None` if we're at the end.
     async fn next_page(&mut self, table: &str) -> Result<Option<QueryResult>> {
-        match self.get_pagination_strategy(table).await? {
+        let res = match self.get_pagination_strategy(table).await? {
             PaginationStrategy::Cursor(_) => {
                 // Cursor is advanced inside query() when data is fetched.
                 // Just run the query and return the result.
@@ -411,7 +413,7 @@ impl drivers::DbDriver for PostgresDriver {
                 if result.rows.is_empty() {
                     return Ok(None);
                 }
-                return Ok(Some(result));
+                Ok(Some(result))
             }
             PaginationStrategy::Offset => {
                 let old_offset = self.query_state.offset;
@@ -427,9 +429,15 @@ impl drivers::DbDriver for PostgresDriver {
                     return Ok(None);
                 }
 
-                return Ok(Some(result));
+                Ok(Some(result))
             }
+        };
+
+        if let Ok(_) = res {
+            self.current_page += 1;
         }
+
+        return res;
     }
 
     async fn prev_page(&mut self, table_name: &str) -> Result<()> {
@@ -437,7 +445,10 @@ impl drivers::DbDriver for PostgresDriver {
             PaginationStrategy::Cursor(_) => {
                 if let Some(cursor_history) = self.query_state.cursor_history.get_mut(table_name) {
                     cursor_history.pop();
-                    cursor_history.pop();
+                    let popped = cursor_history.pop();
+                    if let Some(_) = popped {
+                        self.current_page -= 1;
+                    }
                 }
             }
             PaginationStrategy::Offset => {
@@ -446,6 +457,7 @@ impl drivers::DbDriver for PostgresDriver {
 
                 if old_offset != new_offset {
                     self.query_state.offset = new_offset;
+                    self.current_page -= 1;
                 }
             }
         };
@@ -457,7 +469,7 @@ impl drivers::DbDriver for PostgresDriver {
         self.query_state = QueryState::new();
     }
 
-    async fn get_current_page(&self, table_name: &str) -> Result<usize> {
+    async fn get_current_pos(&self, table_name: &str) -> Result<usize> {
         return match self.get_pagination_strategy(table_name).await? {
             PaginationStrategy::Cursor(_) => {
                 let pos = self
@@ -470,5 +482,9 @@ impl drivers::DbDriver for PostgresDriver {
             }
             PaginationStrategy::Offset => Ok(self.query_state.offset),
         };
+    }
+
+    fn get_current_page(&self) -> usize {
+        return self.current_page;
     }
 }

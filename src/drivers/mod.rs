@@ -25,7 +25,8 @@ pub trait DbDriver: Send + Sync {
     async fn next_page(&mut self, table_name: &str) -> Result<Option<QueryResult>>;
     async fn prev_page(&mut self, table_name: &str) -> Result<()>;
     fn reset_query_state(&mut self);
-    async fn get_current_page(&self, table_name: &str) -> Result<usize>;
+    async fn get_current_pos(&self, table_name: &str) -> Result<usize>;
+    fn get_current_page(&self) -> usize;
 }
 
 pub async fn new_connection(kind: DbKind, url: &str) -> Result<Box<dyn DbDriver>> {

@@ -1,3 +1,5 @@
+use crate::models::json_view::JsonViewModel;
+use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Alignment;
 use ratatui::layout::Rect;
@@ -15,9 +17,6 @@ use serde::Serialize;
 use serde_json::Serializer;
 use serde_json::Value;
 use serde_json::ser::PrettyFormatter;
-
-use crate::models::json_view::JsonViewModel;
-use crate::theme::Theme;
 
 pub fn render_json_view(model: &JsonViewModel, theme: &Theme, frame: &mut Frame, area: Rect, focused: bool) {
     match &model.data {

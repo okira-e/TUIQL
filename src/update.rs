@@ -330,7 +330,7 @@ impl App {
                     let res: Result<()> = async {
                         let mut driver = driver.lock().await;
                         let results = driver.query(&table_name).await?;
-                        let current_page = driver.get_current_page(&table_name).await?;
+                        let current_page = driver.get_current_pos(&table_name).await?;
                         let _ = tx.send(Action::Db(DbAction::QueryTableComplete(
                             table_name,
                             results,
@@ -348,7 +348,7 @@ impl App {
                     }
                 });
             }
-            DbAction::QueryTableComplete(table_name, results, current_page) => {
+            DbAction::QueryTableComplete(table_name, results, current_pos) => {
                 self.selected_table = Some(table_name.clone());
 
                 let rows_fetched = results.rows.len();
@@ -356,8 +356,9 @@ impl App {
 
                 self.table_model.table_name = table_name.clone();
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                self.table_model.current_pos = current_page;
+                self.table_model.current_pos = current_pos;
                 self.table_model.table_state.select(Some(0));
+                self.table_model.current_page = 0;
 
                 let msg = format!("Fetched {} rows", rows_fetched);
                 self.report_message(msg, MsgKind::Neutral, MsgLifetime::Short);
@@ -374,10 +375,12 @@ impl App {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
                             if let Some(results) = driver.next_page(&table_name).await? {
-                                let current_page = driver.get_current_page(&table_name).await?;
+                                let current_pos = driver.get_current_pos(&table_name).await?;
+                                let current_page = driver.get_current_page();
                                 let _ = tx.send(Action::Db(DbAction::NextPageComplete(
                                     table_name,
                                     results,
+                                    current_pos,
                                     current_page,
                                 )));
                             }
@@ -394,11 +397,12 @@ impl App {
                     });
                 }
             }
-            DbAction::NextPageComplete(table_name, results, current_page) => {
+            DbAction::NextPageComplete(table_name, results, current_pos, current_page) => {
                 self.table_model.query_result = results;
                 self.table_model.table_name = table_name;
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                self.table_model.current_pos = current_page;
+                self.table_model.current_pos = current_pos;
+                self.table_model.current_page = current_page;
                 self.table_model.reset(Some(0));
 
                 self.statusline_model.is_loading = false;
@@ -416,10 +420,12 @@ impl App {
                             let mut driver = driver.lock().await;
                             driver.prev_page(&table_name).await?;
                             let results = driver.query(&table_name).await?;
-                            let current_page = driver.get_current_page(&table_name).await?;
+                            let current_pos = driver.get_current_pos(&table_name).await?;
+                            let current_page = driver.get_current_page();
                             let _ = tx.send(Action::Db(DbAction::PrevPageComplete(
                                 table_name,
                                 results,
+                                current_pos,
                                 current_page,
                             )));
 
@@ -435,11 +441,12 @@ impl App {
                     });
                 }
             }
-            DbAction::PrevPageComplete(table_name, results, current_page) => {
+            DbAction::PrevPageComplete(table_name, results, current_pos, current_page) => {
                 self.table_model.query_result = results;
                 self.table_model.table_name = table_name;
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                self.table_model.current_pos = current_page;
+                self.table_model.current_pos = current_pos;
+                self.table_model.current_page = current_page;
                 self.table_model.reset(Some(0));
 
                 self.statusline_model.is_loading = false;
