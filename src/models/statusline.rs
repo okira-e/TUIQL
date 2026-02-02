@@ -2,7 +2,6 @@ pub struct StatusLineModel {
     pub mode: StatusLineMode,
     pub msg: StatusLineMsg,
     pub cmd: StatusLineCommand,
-    pub is_loading: bool,
     pub spinner_animation_tick_count: usize,
 }
 
@@ -12,7 +11,6 @@ impl Default for StatusLineModel {
             mode: StatusLineMode::Status,
             msg: StatusLineMsg::default(),
             cmd: StatusLineCommand::default(),
-            is_loading: false,
             spinner_animation_tick_count: 0,
         };
     }

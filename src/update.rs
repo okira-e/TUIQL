@@ -20,25 +20,23 @@ use color_eyre::eyre;
 use tracing::debug;
 
 impl App {
-    pub async fn update(&mut self, action: Action) -> Result<()> {
+    pub fn update(&mut self, action: Action) {
         if !matches!(action, Action::App(AppAction::Tick)) {
             debug!("Received action: {:?}", action);
         }
 
         match action {
-            Action::App(action) => self.update_app(action).await?,
-            Action::Db(action) => self.update_db(action).await?,
+            Action::App(action) => self.update_app(action),
+            Action::Db(action) => self.update_db(action),
             Action::Explorer(action) => self.update_explorer(action),
             Action::ResultsTable(action) => self.update_results_table(action),
-            Action::JsonView(action) => self.update_json_view(action)?,
-            Action::Command(action) => self.update_command(action).await?,
+            Action::JsonView(action) => self.update_json_view(action),
+            Action::Command(action) => self.update_command(action),
             Action::None => {}
         };
-
-        return Ok(());
     }
 
-    async fn update_app(&mut self, action: AppAction) -> Result<()> {
+    fn update_app(&mut self, action: AppAction) {
         let focused_view = self.get_focused_view();
         match action {
             AppAction::Quit => {
@@ -62,10 +60,16 @@ impl App {
                 }
             }
             AppAction::SelectTable(name) => {
-                self.db_driver.lock().await.reset_query_state();
                 self.table_model.reset(Some(0));
-                _ = self.action_tx.send(Action::Db(DbAction::QueryTable(name)));
                 self.focused_pane = Pane::Right;
+
+                let driver = self.db_driver.clone();
+                let tx = self.action_tx.clone();
+
+                tokio::spawn(async move {
+                    driver.lock().await.reset_query_state();
+                    let _ = tx.send(Action::Db(DbAction::QueryTable(name)));
+                });
             }
             AppAction::Resize(w, h) => {
                 self.area.width = w;
@@ -88,10 +92,9 @@ impl App {
                 let msg = format!("{}", err_report);
                 self.report_message(msg, MsgKind::Error, MsgLifetime::Long);
             }
-            AppAction::StopLoading => self.statusline_model.is_loading = false,
+            AppAction::StartLoading => self.is_loading = true,
+            AppAction::StopLoading => self.is_loading = false,
         }
-
-        return Ok(());
     }
 
     fn update_explorer(&mut self, action: ExplorerAction) {
@@ -211,7 +214,7 @@ impl App {
                     model.focused_item = Some(visible_items[selected].clone());
                 }
             }
-        }
+        };
     }
 
     fn update_results_table(&mut self, action: ResultsTableAction) {
@@ -317,10 +320,10 @@ impl App {
         }
     }
 
-    async fn update_db(&mut self, action: DbAction) -> Result<()> {
+    fn update_db(&mut self, action: DbAction) {
         match action {
             DbAction::QueryTable(table_name) => {
-                self.statusline_model.is_loading = true;
+                self.update(Action::App(AppAction::StartLoading));
 
                 // Spawn background task to query
                 let driver = self.db_driver.clone();
@@ -364,8 +367,8 @@ impl App {
                 self.report_message(msg, MsgKind::Neutral, MsgLifetime::Short);
             }
             DbAction::NextPage => {
-                if let Some(selected_table) = &self.selected_table {
-                    self.statusline_model.is_loading = true;
+                if let Some(selected_table) = self.selected_table.clone() {
+                    self.update(Action::App(AppAction::StartLoading));
 
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
@@ -405,11 +408,11 @@ impl App {
                 self.table_model.current_page = current_page;
                 self.table_model.reset(Some(0));
 
-                self.statusline_model.is_loading = false;
+                self.update(Action::App(AppAction::StopLoading));
             }
             DbAction::PrevPage => {
-                if let Some(selected_table) = &self.selected_table {
-                    self.statusline_model.is_loading = true;
+                if let Some(selected_table) = self.selected_table.clone() {
+                    self.update(Action::App(AppAction::StartLoading));
 
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
@@ -449,18 +452,16 @@ impl App {
                 self.table_model.current_page = current_page;
                 self.table_model.reset(Some(0));
 
-                self.statusline_model.is_loading = false;
+                self.update(Action::App(AppAction::StopLoading));
             }
         };
-
-        return Ok(());
     }
 
-    async fn update_command(&mut self, action: CommandAction) -> Result<()> {
+    fn update_command(&mut self, action: CommandAction) {
         match action {
             CommandAction::AddChar(c) => {
                 if c == ' ' && self.statusline_model.cmd.text.is_empty() {
-                    return Ok(());
+                    return;
                 }
 
                 self.statusline_model
@@ -483,17 +484,15 @@ impl App {
                 self.statusline_model.cmd.cursor = new_pos.min(self.statusline_model.cmd.text.len());
             }
             CommandAction::Execute => {
-                self.evaluate_user_command(&self.statusline_model.cmd.text.clone())
-                    .await?;
+                // self.evaluate_user_command(&self.statusline_model.cmd.text.clone())
+                //     .await?;
                 self.statusline_model.cmd.text = String::new();
                 self.statusline_model.cmd.cursor = 0;
             }
         }
-
-        return Ok(());
     }
 
-    fn update_json_view(&mut self, action: JsonViewAction) -> Result<()> {
+    fn update_json_view(&mut self, action: JsonViewAction) {
         match action {
             JsonViewAction::MoveUp => {
                 self.json_view_model.scroll_y = self.json_view_model.scroll_y.saturating_sub(1);
@@ -507,7 +506,5 @@ impl App {
                 self.json_view_model.scroll_y = 0;
             }
         }
-
-        return Ok(());
     }
 }

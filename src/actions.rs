@@ -23,6 +23,7 @@ pub enum AppAction {
     CloseJsonView,
     SetCommandMode,
     ReportError(eyre::Report),
+    StartLoading,
     StopLoading,
 }
 

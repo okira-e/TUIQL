@@ -65,10 +65,16 @@ pub struct App {
     pub statusline_model: StatusLineModel,
     pub json_view_model: JsonViewModel,
     pub settings: Settings,
+    /// Since the driver is behind a mutex, we get automatic serialization of requests that
+    /// throttles database actions to just one at a time.
+    ///
+    /// If we wanted to allow for concurrent requests to the database we could use a semaphore
+    /// instead.
     pub db_driver: Arc<Mutex<Box<dyn DbDriver>>>,
     pub theme: Theme,
     pub selected_table: Option<String>,
     pub area: Rect,
+    pub is_loading: bool,
 }
 
 impl App {
@@ -95,6 +101,7 @@ impl App {
             statusline_model: StatusLineModel::default(),
             json_view_model: JsonViewModel::default(),
             area: Rect::default(),
+            is_loading: false,
         };
     }
 

@@ -11,8 +11,15 @@ use crate::models::statusline::StatusLineMode;
 use crate::models::statusline::StatusLineModel;
 use crate::theme::Theme;
 
-pub fn render_statusline(model: &StatusLineModel, theme: &Theme, frame: &mut Frame, area: Rect, focused: bool) {
-    if model.is_loading {
+pub fn render_statusline(
+    model: &StatusLineModel,
+    theme: &Theme,
+    frame: &mut Frame,
+    area: Rect,
+    focused: bool,
+    is_app_loading: bool,
+) {
+    if is_app_loading {
         // Construct throbber state from its state in the model.
         let mut throbber_state = throbber_widgets_tui::ThrobberState::default();
         for _ in 0..model.spinner_animation_tick_count {

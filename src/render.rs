@@ -55,6 +55,7 @@ impl App {
             frame,
             self.widgets_chunks.statusline_chunk,
             focused_view == View::StatusLine,
+            self.is_loading,
         );
     }
 }
