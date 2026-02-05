@@ -27,8 +27,13 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
     };
 
     let row_count = model.results_row_count;
+    let page = if model.query_result.rows.is_empty() {
+        0
+    } else {
+        model.current_page + 1
+    };
 
-    let container_block = Block::default()
+    let mut container_block = Block::default()
         .title("Query Result".to_string())
         .title(
             Line::from(model.table_name.clone())
@@ -36,16 +41,21 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
                 .alignment(Alignment::Right),
         )
         .title_bottom(
-            Line::from(format!(
-                "Page {} - Count {}",
-                model.current_page + 1,
-                row_count
-            ))
-            .style(theme.fg)
-            .alignment(Alignment::Center),
+            Line::from(format!("Page {} - Count {}", page, row_count))
+                .style(theme.fg)
+                .alignment(Alignment::Center),
         )
         .border_style(container_border_style)
         .borders(Borders::ALL);
+
+    // Set the total count of the table if it has been fetched.
+    if let Some(total_count) = model.total_count {
+        container_block = container_block.title_bottom(
+            Line::from(format!("Total Count: {}", total_count))
+                .style(theme.fg)
+                .alignment(Alignment::Right),
+        );
+    }
 
     frame.render_widget(&container_block, area);
 
@@ -105,7 +115,7 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
                 .bottom_margin(1), // Space between header and rows
         )
         .row_highlight_style(if focused {
-            Style::default().bg(Color::DarkGray)
+            Style::default().bg(theme.highlight).add_modifier(Modifier::BOLD)
         } else {
             Style::default()
         })

@@ -25,7 +25,7 @@ pub struct ExplorerModel {
     /// All fetched tables/views
     pub items: Vec<ExplorerItem>,
     pub table_state: ratatui::widgets::TableState,
-    pub selected_tab: ExplorerItemKind,
+    pub focused_tab: ExplorerItemKind,
     /// Horizontal scroll offset for long item names
     pub horizontal_scroll_offset: usize,
 }

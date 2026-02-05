@@ -9,6 +9,7 @@ pub struct Theme {
     pub error: Color,
     pub success: Color,
     pub pane_focus: Color,
+    pub highlight: Color,
 }
 
 impl Theme {
@@ -26,6 +27,7 @@ impl Theme {
             error: p.red,
             success: p.green,
             pane_focus: p.blue,
+            highlight: p.highlight,
         }
     }
 }
@@ -39,6 +41,7 @@ pub struct Palette {
     pub base: Color,
     pub text: Color,
     pub blue: Color,
+    pub highlight: Color,
     pub green: Color,
     pub mauve: Color,
     pub flamingo: Color,
@@ -53,6 +56,7 @@ pub const LATTE: Palette = Palette {
     mauve: Color::Rgb(136, 57, 239),
     flamingo: Color::Rgb(221, 120, 120),
     red: Color::Rgb(210, 15, 57),
+    highlight: Color::Rgb(230, 233, 239),
 };
 
 pub const MOCHA: Palette = Palette {
@@ -63,4 +67,5 @@ pub const MOCHA: Palette = Palette {
     mauve: Color::Rgb(203, 166, 247),
     flamingo: Color::Rgb(242, 205, 205),
     red: Color::Rgb(243, 139, 168),
+    highlight: Color::Rgb(49, 50, 68),
 };

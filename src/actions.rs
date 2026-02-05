@@ -1,4 +1,7 @@
 use crate::drivers::QueryResult;
+use crate::models::statusline::MsgKind;
+use crate::models::statusline::MsgLifetime;
+use color_eyre::Result;
 use color_eyre::eyre;
 
 #[derive(Debug)]
@@ -8,7 +11,8 @@ pub enum Action {
     ResultsTable(ResultsTableAction),
     Db(DbAction),
     JsonView(JsonViewAction),
-    Command(CommandAction),
+    CmdLine(CmdLineAction),
+    Cmd(CmdAction),
     None,
 }
 
@@ -22,12 +26,13 @@ pub enum AppAction {
     ViewSelectedRowAsJson,
     CloseJsonView,
     SetCommandMode,
+    ReportMessage(String, MsgKind, MsgLifetime),
     ReportError(eyre::Report),
     StartLoading,
     StopLoading,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum ExplorerAction {
     MoveUp,
     MoveDown,
@@ -37,7 +42,7 @@ pub enum ExplorerAction {
     GoToLast,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum ResultsTableAction {
     MoveUp,
     MoveDown,
@@ -52,9 +57,11 @@ pub enum ResultsTableAction {
     YankSelection,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum DbAction {
     QueryTable(String),
+    QueryCount,
+    QueryCountComplete(Result<usize>),
     QueryTableComplete(String, QueryResult, usize),
     NextPage,
     NextPageComplete(String, QueryResult, usize, usize),
@@ -62,18 +69,24 @@ pub enum DbAction {
     PrevPageComplete(String, QueryResult, usize, usize),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum JsonViewAction {
     MoveUp,
     MoveDown,
     GoToFirst,
 }
 
-#[derive(Debug, Clone)]
-pub enum CommandAction {
+#[derive(Debug)]
+pub enum CmdLineAction {
     AddChar(char),
     PopChar,
     MoveLeft,
     MoveRight,
     Execute,
+    Exit,
+}
+
+#[derive(Debug)]
+pub enum CmdAction {
+    Count,
 }

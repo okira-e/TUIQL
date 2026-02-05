@@ -9,6 +9,7 @@ pub struct TableModel {
     pub table_name: String,
     pub query_result: QueryResult,
     pub results_row_count: usize,
+    pub total_count: Option<usize>,
     pub current_pos: usize,
     /// Dictates how many columns to skip horizontally
     pub horizontal_scroll_offset: usize,
@@ -17,7 +18,7 @@ pub struct TableModel {
 }
 
 impl TableModel {
-    pub fn reset(&mut self, selected_row: Option<usize>) {
+    pub fn reset_ui(&mut self, selected_row: Option<usize>) {
         self.horizontal_scroll_offset = 0;
         *self.table_state.offset_mut() = 0;
         self.table_state.select(selected_row);

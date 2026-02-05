@@ -37,6 +37,7 @@ pub enum View {
 pub enum Pane {
     Left,
     Right,
+    StatusLine,
 }
 
 pub enum RightView {
@@ -209,6 +210,7 @@ impl App {
                 RightView::ResultsTable => View::ResultsTable,
                 RightView::JsonView => View::JsonView,
             },
+            Pane::StatusLine => View::StatusLine,
         };
     }
 }

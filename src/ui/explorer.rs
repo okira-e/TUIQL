@@ -31,17 +31,17 @@ pub fn render_explorer(model: &mut ExplorerModel, theme: &Theme, frame: &mut Fra
     // Draw the container
     //
 
-    let table_tab_color = if model.selected_tab == ExplorerItemKind::Table {
+    let table_tab_color = if model.focused_tab == ExplorerItemKind::Table {
         theme.selection
     } else {
         theme.fg
     };
-    let view_tab_color = if model.selected_tab == ExplorerItemKind::View {
+    let view_tab_color = if model.focused_tab == ExplorerItemKind::View {
         theme.selection
     } else {
         theme.fg
     };
-    let mview_tab_color = if model.selected_tab == ExplorerItemKind::MaterializedView {
+    let mview_tab_color = if model.focused_tab == ExplorerItemKind::MaterializedView {
         theme.selection
     } else {
         theme.fg
@@ -81,11 +81,18 @@ pub fn render_explorer(model: &mut ExplorerModel, theme: &Theme, frame: &mut Fra
     // Draw tab title
     //
 
-    let tab_title = match model.selected_tab {
+    let items: Vec<ExplorerItem> = match model.focused_tab {
+        ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
+        ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
+        ExplorerItemKind::MaterializedView => model.get_items_by_kind(ExplorerItemKind::MaterializedView),
+    };
+
+    let tab_title = match model.focused_tab {
         ExplorerItemKind::Table => "Tables",
         ExplorerItemKind::View => "Views",
         ExplorerItemKind::MaterializedView => "Materialized Views",
     };
+    let tab_title = format!("{} ({})", tab_title, items.len());
 
     let p = Paragraph::new(tab_title)
         .style(theme.fg)
@@ -97,15 +104,8 @@ pub fn render_explorer(model: &mut ExplorerModel, theme: &Theme, frame: &mut Fra
     // Draw the items table
     //
 
-    // Get items for current tab (MaterializedView uses View data for now)
-    let items: Vec<ExplorerItem> = match model.selected_tab {
-        ExplorerItemKind::Table => model.get_items_by_kind(ExplorerItemKind::Table),
-        ExplorerItemKind::View => model.get_items_by_kind(ExplorerItemKind::View),
-        ExplorerItemKind::MaterializedView => model.get_items_by_kind(ExplorerItemKind::MaterializedView),
-    };
-
     if items.is_empty() {
-        let empty_msg = match model.selected_tab {
+        let empty_msg = match model.focused_tab {
             ExplorerItemKind::Table => "No tables",
             ExplorerItemKind::View => "No views",
             ExplorerItemKind::MaterializedView => "No materialized views",

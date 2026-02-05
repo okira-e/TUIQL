@@ -1,6 +1,6 @@
 use crate::actions::Action;
 use crate::actions::AppAction;
-use crate::actions::CommandAction;
+use crate::actions::CmdLineAction;
 use crate::actions::DbAction;
 use crate::actions::ExplorerAction;
 use crate::actions::JsonViewAction;
@@ -174,27 +174,32 @@ impl App {
 
             View::StatusLine => match (key.modifiers, key.code) {
                 (_, KeyCode::Char(c)) => {
-                    self.update(Action::Command(CommandAction::AddChar(c)));
+                    self.update(Action::CmdLine(CmdLineAction::AddChar(c)));
                     return;
                 }
 
                 (_, KeyCode::Backspace) => {
-                    self.update(Action::Command(CommandAction::PopChar));
+                    self.update(Action::CmdLine(CmdLineAction::PopChar));
                     return;
                 }
 
                 (_, KeyCode::Left) => {
-                    self.update(Action::Command(CommandAction::MoveLeft));
+                    self.update(Action::CmdLine(CmdLineAction::MoveLeft));
                     return;
                 }
 
                 (_, KeyCode::Right) => {
-                    self.update(Action::Command(CommandAction::MoveRight));
+                    self.update(Action::CmdLine(CmdLineAction::MoveRight));
                     return;
                 }
 
                 (_, KeyCode::Enter) => {
-                    self.update(Action::Command(CommandAction::Execute));
+                    self.update(Action::CmdLine(CmdLineAction::Execute));
+                    return;
+                }
+
+                (_, KeyCode::Esc) => {
+                    self.update(Action::CmdLine(CmdLineAction::Exit));
                     return;
                 }
 
@@ -237,6 +242,7 @@ impl App {
                 return;
             }
             (_, KeyCode::Char(':')) => {
+                self.update(Action::App(AppAction::SetCommandMode));
                 return;
             }
             _ => {}

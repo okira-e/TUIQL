@@ -5,6 +5,19 @@ pub struct StatusLineModel {
     pub spinner_animation_tick_count: usize,
 }
 
+impl StatusLineModel {
+    /// Resets the status line state that's related to the mode you give it.
+    pub fn reset(&mut self) {
+        match self.mode {
+            StatusLineMode::Status => *self = Self::default(),
+            StatusLineMode::Command => {
+                self.cmd.cursor = 0;
+                self.cmd.text = String::new();
+            }
+        }
+    }
+}
+
 impl Default for StatusLineModel {
     fn default() -> Self {
         return Self {
@@ -16,14 +29,14 @@ impl Default for StatusLineModel {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum MsgKind {
     Error,
     Success,
     Neutral,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum MsgLifetime {
     Forever,
     Short,
@@ -70,6 +83,7 @@ impl Default for StatusLineCommand {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum StatusLineMode {
     Status,
     Command,

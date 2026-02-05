@@ -1,3 +1,7 @@
+use crate::models::statusline::MsgKind;
+use crate::models::statusline::StatusLineMode;
+use crate::models::statusline::StatusLineModel;
+use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Position;
 use ratatui::layout::Rect;
@@ -5,11 +9,6 @@ use ratatui::style::Style;
 use ratatui::widgets::Block;
 use ratatui::widgets::Padding;
 use ratatui::widgets::Paragraph;
-
-use crate::models::statusline::MsgKind;
-use crate::models::statusline::StatusLineMode;
-use crate::models::statusline::StatusLineModel;
-use crate::theme::Theme;
 
 pub fn render_statusline(
     model: &StatusLineModel,
@@ -37,7 +36,7 @@ pub fn render_statusline(
     }
 
     let padding = Block::default().padding(Padding::left(1));
-    match &model.mode {
+    match model.mode {
         StatusLineMode::Status => {
             let fg = match model.msg.kind {
                 MsgKind::Error => theme.error,
@@ -53,11 +52,15 @@ pub fn render_statusline(
         }
         StatusLineMode::Command => {
             let text = format!(": {}", model.cmd.text);
-            let line_widget = Paragraph::new(text);
+            let widget = Paragraph::new(text);
 
-            frame.render_widget(&line_widget, area);
+            frame.render_widget(&widget, area);
             if focused {
-                frame.set_cursor_position(Position { x: area.x + model.cmd.cursor as u16 + 2, y: area.y + 1 });
+                let left_padding = 2; // The ": "
+                frame.set_cursor_position(Position {
+                    x: area.x + model.cmd.cursor as u16 + left_padding,
+                    y: area.y + 1,
+                });
             }
         }
     }
