@@ -1,4 +1,4 @@
-use crate::commander;
+use crate::commander::GotoCmd;
 use crate::drivers::QueryResult;
 use crate::models::statusline::MsgKind;
 use crate::models::statusline::MsgLifetime;
@@ -13,8 +13,7 @@ pub enum Action {
     Db(DbAction),
     JsonView(JsonViewAction),
     CmdLine(CmdLineAction),
-    Cmd(commander::Cmd),
-    None,
+    Cmd(AppCmd),
 }
 
 #[derive(Debug)]
@@ -86,4 +85,10 @@ pub enum CmdLineAction {
     MoveRight,
     Execute,
     Exit,
+}
+
+#[derive(Debug)]
+pub enum AppCmd {
+    Count,
+    Goto(GotoCmd),
 }

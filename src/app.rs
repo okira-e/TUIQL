@@ -1,4 +1,6 @@
 use crate::actions::Action;
+use crate::actions::AppAction;
+use crate::actions::AppCmd;
 use crate::commander::Cmd;
 use crate::commander::parse_cmd;
 use crate::config::Settings;
@@ -216,10 +218,11 @@ impl App {
         };
     }
 
-    pub fn evaluate_action_from_cmd(&mut self, cmd: &str) -> Result<Action> {
+    pub fn evaluate_app_action_from_cmd(&mut self, cmd: &str) -> Result<Action> {
         return match parse_cmd(cmd)? {
-            Cmd::Count => Ok(Action::Cmd(Cmd::Count)),
-            Cmd::Goto(sub_cmd) => Ok(Action::Cmd(Cmd::Goto(sub_cmd))),
+            Cmd::Quit => Ok(Action::App(AppAction::Quit)),
+            Cmd::Count => Ok(Action::Cmd(AppCmd::Count)),
+            Cmd::Goto(sub_cmd) => Ok(Action::Cmd(AppCmd::Goto(sub_cmd))),
         };
     }
 }

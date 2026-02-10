@@ -1,5 +1,6 @@
 use crate::actions::Action;
 use crate::actions::AppAction;
+use crate::actions::AppCmd;
 use crate::actions::CmdLineAction;
 use crate::actions::DbAction;
 use crate::actions::ExplorerAction;
@@ -9,7 +10,6 @@ use crate::app::App;
 use crate::app::Pane;
 use crate::app::RightView;
 use crate::app::View;
-use crate::commander::Cmd;
 use crate::commander::GotoCmd;
 use crate::models::explorer::ExplorerItemKind;
 use crate::models::statusline::MsgKind;
@@ -35,7 +35,6 @@ impl App {
             Action::JsonView(action) => self.update_json_view(action),
             Action::CmdLine(action) => self.update_cmdline(action),
             Action::Cmd(action) => self.update_cmd(action),
-            Action::None => {}
         };
     }
 
@@ -513,7 +512,7 @@ impl App {
                 let cmd = std::mem::take(&mut self.statusline_model.cmd.text);
                 self.statusline_model.cmd.cursor = 0;
 
-                let action = self.evaluate_action_from_cmd(&cmd);
+                let action = self.evaluate_app_action_from_cmd(&cmd);
                 match action {
                     Ok(action) => self.update(action),
                     Err(err) => {
@@ -553,15 +552,14 @@ impl App {
         }
     }
 
-    fn update_cmd(&mut self, action: Cmd) {
+    fn update_cmd(&mut self, action: AppCmd) {
         match action {
-            Cmd::Count => self.update(Action::Db(DbAction::QueryCount)),
-            Cmd::Goto(cmd) => match cmd {
-                GotoCmd::Page(page) => match &self.selected_table {
+            AppCmd::Count => self.update(Action::Db(DbAction::QueryCount)),
+            AppCmd::Goto(cmd) => match cmd {
+                GotoCmd::Page(page) => match self.selected_table.clone() {
                     Some(table) => {
                         let db_driver = self.db_driver.clone();
                         let tx = self.action_tx.clone();
-                        let table = table.clone();
                         let limit = self.table_model.page_size;
                         tokio::spawn(async move {
                             let res: Result<()> = async {

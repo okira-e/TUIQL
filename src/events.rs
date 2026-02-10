@@ -207,6 +207,11 @@ impl App {
             },
 
             View::JsonView => match (key.modifiers, key.code) {
+                (_, KeyCode::Char('g')) => {
+                    self.update(Action::JsonView(JsonViewAction::GoToFirst));
+                    return;
+                }
+
                 (_, KeyCode::Char('k') | KeyCode::Up) | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
                     self.update(Action::JsonView(JsonViewAction::MoveUp));
                     return;
