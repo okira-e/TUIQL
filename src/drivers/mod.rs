@@ -3,8 +3,6 @@ pub mod kinds;
 pub mod postgres;
 // pub mod sqlite;
 
-use std::fmt;
-
 use async_trait::async_trait;
 use color_eyre::Result;
 
@@ -16,30 +14,22 @@ pub trait DbDriver: Send + Sync {
     async fn get_tables(&self) -> Result<Vec<String>>;
     async fn get_views(&self) -> Result<Vec<String>>;
     async fn get_mateialized_views(&self) -> Result<Vec<String>>;
-    async fn query(&mut self, table_name: &str) -> Result<QueryResult>;
+    async fn query(&mut self, table_name: &str, limit: usize) -> Result<QueryResult>;
     async fn query_count(&mut self, table_name: &str) -> Result<usize>;
     async fn get_order_by_clause(&mut self, table_name: &str) -> Result<String>;
     async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>>;
     async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>>;
-    async fn get_pagination_strategy(&self, table_name: &str) -> Result<PaginationStrategy>;
-    async fn next_page(&mut self, table_name: &str) -> Result<Option<QueryResult>>;
-    async fn prev_page(&mut self, table_name: &str) -> Result<()>;
+    async fn next_page(&mut self, table_name: &str, limit: usize) -> Result<Option<QueryResult>>;
+    async fn prev_page(&mut self, limit: usize) -> Result<()>;
+    async fn goto_page(&mut self, page: usize, table: &str, limit: usize) -> Result<Option<QueryResult>>;
     fn reset_query_state(&mut self);
-    async fn get_current_pos(&self, table_name: &str) -> Result<usize>;
-    fn get_current_page(&self) -> usize;
 }
 
 pub async fn new_connection(kind: DbKind, url: &str) -> Result<Box<dyn DbDriver>> {
     return match kind {
-        DbKind::MySQL | DbKind::Mariadb => {
-            // Ok(Arc::new(MySqlDriver::new_pool(url).await?))
-            todo!()
-        }
+        DbKind::MySQL | DbKind::Mariadb => todo!(),
         DbKind::Postgres => Ok(Box::new(PostgresDriver::new_pool(url).await?)),
-        DbKind::SQLite => {
-            // Ok(Arc::new(SqliteDriver::new_pool(url).await?))
-            todo!()
-        }
+        DbKind::SQLite => todo!(),
     };
 }
 
@@ -52,15 +42,9 @@ pub async fn ping_connection(
     db_name: &str,
 ) -> Result<()> {
     match kind {
-        DbKind::MySQL | DbKind::Mariadb => {
-            // MySqlDriver::ping().await
-            todo!()
-        }
+        DbKind::MySQL | DbKind::Mariadb => todo!(),
         DbKind::Postgres => PostgresDriver::ping(host, port, user, password, db_name).await,
-        DbKind::SQLite => {
-            // SqliteDriver::ping().await
-            todo!()
-        }
+        DbKind::SQLite => todo!(),
     }
 }
 
@@ -74,20 +58,4 @@ pub struct QueryResult {
 pub struct ColumnMetadata {
     pub name: String,
     pub data_type: String,
-}
-
-#[derive(Debug, Clone)]
-pub enum PaginationStrategy {
-    /// Holds the cursor based column
-    Cursor(String),
-    Offset,
-}
-
-impl fmt::Display for PaginationStrategy {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            PaginationStrategy::Offset => write!(f, "Offset"),
-            PaginationStrategy::Cursor(_) => write!(f, "Cursor"),
-        }
-    }
 }

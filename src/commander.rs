@@ -1,38 +1,54 @@
-use crate::actions::Action;
-use crate::actions::CmdAction;
-use crate::app::App;
-use std::fmt::Display;
+use color_eyre::eyre::Result;
+use color_eyre::eyre::bail;
+use std::str::Split;
 
-pub enum Command {
+#[derive(Debug)]
+pub enum Cmd {
     /// Returns the total count of the currently selected table
     Count,
+    Goto(GotoCmd),
 }
 
-impl Display for Command {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Command::Count => write!(f, "count"),
-        }
-    }
+#[derive(Debug)]
+pub enum GotoCmd {
+    Page(usize),
 }
 
-impl App {
-    pub fn evaluate_cmd(&self, cmd: &str) -> Action {
-        if let Some(cmd) = self.parse_cmd(cmd) {
-            match cmd {
-                Command::Count => {
-                    return Action::Cmd(CmdAction::Count);
-                }
+pub fn parse_cmd(cmd: &str) -> Result<Cmd> {
+    let mut iter = cmd.split(" ");
+
+    let cmd = iter.next();
+    return match cmd {
+        Some(cmd) => match cmd {
+            "count" | "c" => Ok(Cmd::Count),
+            "goto" | "g" => parse_goto_cmd(&mut iter),
+            _ => bail!("Unknown command: {}", cmd),
+        },
+        None => bail!("Empty command"),
+    };
+}
+
+fn parse_goto_cmd(iter: &mut Split<&str>) -> Result<Cmd> {
+    let cmd = iter.next();
+    return match cmd {
+        Some(cmd) => match cmd {
+            "page" | "p" => parse_goto_arg_cmd(iter),
+            _ => bail!("Unknown goto sub-command: {}", cmd),
+        },
+        None => bail!("Missing goto sub-command"),
+    };
+}
+
+fn parse_goto_arg_cmd(iter: &mut Split<&str>) -> Result<Cmd> {
+    let arg = iter.next();
+    return match arg {
+        Some(arg) => {
+            if let Ok(page_num) = arg.parse::<usize>() {
+                Ok(Cmd::Goto(GotoCmd::Page(page_num)))
+            } else {
+                bail!("Invalid page number: {}", arg)
             }
-        };
-
-        return Action::None;
-    }
-
-    fn parse_cmd(&self, cmd: &str) -> Option<Command> {
-        return match cmd.trim().to_lowercase().as_str() {
-            "count" | "c" => Some(Command::Count),
-            _ => None,
-        };
-    }
+        }
+        None => bail!("Missing page number argument"),
+    };
 }

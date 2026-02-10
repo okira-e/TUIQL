@@ -1,7 +1,9 @@
 use crate::actions::Action;
+use crate::commander::Cmd;
+use crate::commander::parse_cmd;
 use crate::config::Settings;
+use crate::drivers;
 use crate::drivers::DbDriver;
-use crate::drivers::{self};
 use crate::models::explorer::ExplorerItem;
 use crate::models::explorer::ExplorerItemKind;
 use crate::models::explorer::ExplorerModel;
@@ -193,7 +195,7 @@ impl App {
         self.widgets_chunks.statusline_chunk = app_statusline_split[1];
     }
 
-    pub fn report_message(&mut self, text: impl Into<String>, kind: MsgKind, lifetime: MsgLifetime) {
+    pub fn report_message(&mut self, text: &str, kind: MsgKind, lifetime: MsgLifetime) {
         self.statusline_model.mode = StatusLineMode::Status;
         self.statusline_model.msg = StatusLineMsg {
             text: text.into(),
@@ -211,6 +213,13 @@ impl App {
                 RightView::JsonView => View::JsonView,
             },
             Pane::StatusLine => View::StatusLine,
+        };
+    }
+
+    pub fn evaluate_action_from_cmd(&mut self, cmd: &str) -> Result<Action> {
+        return match parse_cmd(cmd)? {
+            Cmd::Count => Ok(Action::Cmd(Cmd::Count)),
+            Cmd::Goto(sub_cmd) => Ok(Action::Cmd(Cmd::Goto(sub_cmd))),
         };
     }
 }

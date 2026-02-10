@@ -4,24 +4,39 @@ use ratatui::layout::Constraint;
 use ratatui::widgets::TableState;
 use serde_json::Value;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TableModel {
     pub table_name: String,
     pub query_result: QueryResult,
     pub results_row_count: usize,
     pub total_count: Option<usize>,
-    pub current_pos: usize,
+    pub page_size: usize,
     /// Dictates how many columns to skip horizontally
     pub horizontal_scroll_offset: usize,
-    pub table_state: TableState,
+    pub ratatui_table_state: TableState,
     pub current_page: usize,
+}
+
+impl Default for TableModel {
+    fn default() -> Self {
+        Self {
+            table_name: Default::default(),
+            query_result: QueryResult::default(),
+            results_row_count: Default::default(),
+            total_count: Default::default(),
+            page_size: 200,
+            horizontal_scroll_offset: Default::default(),
+            ratatui_table_state: Default::default(),
+            current_page: Default::default(),
+        }
+    }
 }
 
 impl TableModel {
     pub fn reset_ui(&mut self, selected_row: Option<usize>) {
         self.horizontal_scroll_offset = 0;
-        *self.table_state.offset_mut() = 0;
-        self.table_state.select(selected_row);
+        *self.ratatui_table_state.offset_mut() = 0;
+        self.ratatui_table_state.select(selected_row);
     }
 
     pub fn get_visible_cols(&self, width: u16) -> (Vec<ColumnMetadata>, Vec<Constraint>) {
@@ -59,7 +74,7 @@ impl TableModel {
             return None;
         }
 
-        match self.table_state.selected() {
+        match self.ratatui_table_state.selected() {
             None => return None,
             Some(pos) => {
                 return Some(self.query_result.rows[pos].clone());

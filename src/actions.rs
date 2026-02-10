@@ -1,3 +1,4 @@
+use crate::commander;
 use crate::drivers::QueryResult;
 use crate::models::statusline::MsgKind;
 use crate::models::statusline::MsgLifetime;
@@ -12,7 +13,7 @@ pub enum Action {
     Db(DbAction),
     JsonView(JsonViewAction),
     CmdLine(CmdLineAction),
-    Cmd(CmdAction),
+    Cmd(commander::Cmd),
     None,
 }
 
@@ -62,11 +63,12 @@ pub enum DbAction {
     QueryTable(String),
     QueryCount,
     QueryCountComplete(Result<usize>),
-    QueryTableComplete(String, QueryResult, usize),
+    QueryTableComplete(String, QueryResult),
     NextPage,
-    NextPageComplete(String, QueryResult, usize, usize),
+    NextPageComplete(QueryResult),
     PrevPage,
-    PrevPageComplete(String, QueryResult, usize, usize),
+    PrevPageComplete(QueryResult),
+    GotoPageComplete(QueryResult, usize),
 }
 
 #[derive(Debug)]
@@ -84,9 +86,4 @@ pub enum CmdLineAction {
     MoveRight,
     Execute,
     Exit,
-}
-
-#[derive(Debug)]
-pub enum CmdAction {
-    Count,
 }

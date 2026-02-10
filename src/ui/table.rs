@@ -26,7 +26,6 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
         Style::default().bg(theme.bg)
     };
 
-    let row_count = model.results_row_count;
     let page = if model.query_result.rows.is_empty() {
         0
     } else {
@@ -40,21 +39,36 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
                 .style(theme.fg)
                 .alignment(Alignment::Right),
         )
-        .title_bottom(
-            Line::from(format!("Page {} - Count {}", page, row_count))
-                .style(theme.fg)
-                .alignment(Alignment::Center),
-        )
         .border_style(container_border_style)
         .borders(Borders::ALL);
 
-    // Set the total count of the table if it has been fetched.
+    //
+    // Set the total count/pages of the table if it has been fetched.
+    //
+
     if let Some(total_count) = model.total_count {
-        container_block = container_block.title_bottom(
-            Line::from(format!("Total Count: {}", total_count))
+        let total_pages = (total_count as f64 / model.page_size as f64).ceil();
+
+        container_block = container_block
+            .title_bottom(
+                Line::from(format!(
+                    "Page {}/{} - Rows {}",
+                    page, total_pages, model.results_row_count
+                ))
                 .style(theme.fg)
-                .alignment(Alignment::Right),
-        );
+                .alignment(Alignment::Center),
+            )
+            .title_bottom(
+                Line::from(format!("Total Count: {}", total_count))
+                    .style(theme.fg)
+                    .alignment(Alignment::Right),
+            );
+    } else {
+        container_block = container_block.title_bottom(
+            Line::from(format!("Page {} - Rows {}", page, model.results_row_count))
+                .style(theme.fg)
+                .alignment(Alignment::Center),
+        )
     }
 
     frame.render_widget(&container_block, area);
@@ -78,7 +92,10 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
 
     let (visible_cols, widths) = model.get_visible_cols(area.width);
 
+    //
     // Populate rows
+    //
+
     let visible_rows = model.query_result.rows.clone();
     let mut table_rows: Vec<Row> = vec![];
     for row in visible_rows.iter() {
@@ -122,7 +139,7 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
         .widths(widths)
         .highlight_symbol("> ");
 
-    frame.render_stateful_widget(table, table_area, &mut model.table_state);
+    frame.render_stateful_widget(table, table_area, &mut model.ratatui_table_state);
 
     //
     // Render the horizontal scrollbar

@@ -1,6 +1,5 @@
 use crate::actions::Action;
 use crate::actions::AppAction;
-use crate::actions::CmdAction;
 use crate::actions::CmdLineAction;
 use crate::actions::DbAction;
 use crate::actions::ExplorerAction;
@@ -10,6 +9,8 @@ use crate::app::App;
 use crate::app::Pane;
 use crate::app::RightView;
 use crate::app::View;
+use crate::commander::Cmd;
+use crate::commander::GotoCmd;
 use crate::models::explorer::ExplorerItemKind;
 use crate::models::statusline::MsgKind;
 use crate::models::statusline::MsgLifetime;
@@ -103,12 +104,12 @@ impl App {
             }
             AppAction::ReportError(err_report) => {
                 let msg = format!("{}", err_report);
-                self.report_message(msg, MsgKind::Error, MsgLifetime::Long);
+                self.report_message(&msg, MsgKind::Error, MsgLifetime::Long);
             }
             AppAction::StartLoading => self.is_loading = true,
             AppAction::StopLoading => self.is_loading = false,
             AppAction::ReportMessage(msg, msg_kind, msg_lifetime) => {
-                self.report_message(msg, msg_kind, msg_lifetime);
+                self.report_message(&msg, msg_kind, msg_lifetime);
             }
         }
     }
@@ -239,7 +240,7 @@ impl App {
             return;
         }
 
-        let current = self.table_model.table_state.selected().unwrap_or(0);
+        let current = self.table_model.ratatui_table_state.selected().unwrap_or(0);
 
         // Calculate how many rows fit in the viewport
         let table_header_and_footer_height = 5;
@@ -248,11 +249,11 @@ impl App {
         match action {
             ResultsTableAction::MoveUp => {
                 let new_index = if current == 0 { 0 } else { current - 1 };
-                self.table_model.table_state.select(Some(new_index));
+                self.table_model.ratatui_table_state.select(Some(new_index));
 
                 // Only scroll up if cursor would go ABOVE the viewport
-                if new_index < *self.table_model.table_state.offset_mut() {
-                    *self.table_model.table_state.offset_mut() = new_index;
+                if new_index < *self.table_model.ratatui_table_state.offset_mut() {
+                    *self.table_model.ratatui_table_state.offset_mut() = new_index;
                 }
             }
             ResultsTableAction::MoveDown => {
@@ -261,12 +262,12 @@ impl App {
                 } else {
                     current + 1
                 };
-                self.table_model.table_state.select(Some(new_index));
+                self.table_model.ratatui_table_state.select(Some(new_index));
 
                 // Only scroll down if cursor would go BELOW the viewport
-                let viewport_bottom = *self.table_model.table_state.offset_mut() + visible_rows;
+                let viewport_bottom = *self.table_model.ratatui_table_state.offset_mut() + visible_rows;
                 if new_index >= viewport_bottom {
-                    *self.table_model.table_state.offset_mut() = new_index.saturating_sub(visible_rows - 1);
+                    *self.table_model.ratatui_table_state.offset_mut() = new_index.saturating_sub(visible_rows - 1);
                 }
             }
             ResultsTableAction::ScrollLeft => {
@@ -288,10 +289,10 @@ impl App {
             ResultsTableAction::JumpUp => {
                 let jump = 10;
                 let new_index = current.saturating_sub(jump);
-                self.table_model.table_state.select(Some(new_index));
+                self.table_model.ratatui_table_state.select(Some(new_index));
                 // Only scroll up if cursor would go ABOVE the viewport
-                if new_index < *self.table_model.table_state.offset_mut() {
-                    *self.table_model.table_state.offset_mut() = new_index;
+                if new_index < *self.table_model.ratatui_table_state.offset_mut() {
+                    *self.table_model.ratatui_table_state.offset_mut() = new_index;
                 }
             }
             ResultsTableAction::JumpDown => {
@@ -300,21 +301,21 @@ impl App {
                 if new_index >= total_rows {
                     new_index = total_rows - 1;
                 }
-                self.table_model.table_state.select(Some(new_index));
+                self.table_model.ratatui_table_state.select(Some(new_index));
 
                 // Only scroll down if cursor would go BELOW the viewport
-                let viewport_bottom = *self.table_model.table_state.offset_mut() + visible_rows;
+                let viewport_bottom = *self.table_model.ratatui_table_state.offset_mut() + visible_rows;
                 if new_index >= viewport_bottom {
-                    *self.table_model.table_state.offset_mut() = new_index.saturating_sub(visible_rows - 1);
+                    *self.table_model.ratatui_table_state.offset_mut() = new_index.saturating_sub(visible_rows - 1);
                 }
             }
             ResultsTableAction::GoToFirstVertically => {
-                self.table_model.table_state.select(Some(0));
-                *self.table_model.table_state.offset_mut() = 0;
+                self.table_model.ratatui_table_state.select(Some(0));
+                *self.table_model.ratatui_table_state.offset_mut() = 0;
             }
             ResultsTableAction::GoToLastVertically => {
-                self.table_model.table_state.select(Some(total_rows - 1));
-                *self.table_model.table_state.offset_mut() = total_rows.saturating_sub(visible_rows);
+                self.table_model.ratatui_table_state.select(Some(total_rows - 1));
+                *self.table_model.ratatui_table_state.offset_mut() = total_rows.saturating_sub(visible_rows);
             }
             ResultsTableAction::YankSelection => {
                 if let Some(row) = self.table_model.get_selected_row_data() {
@@ -344,16 +345,14 @@ impl App {
                 // Spawn background task to query
                 let driver = self.db_driver.clone();
                 let tx = self.action_tx.clone();
+                let limit = self.table_model.page_size;
 
                 tokio::spawn(async move {
                     let res: Result<()> = async {
                         let mut driver = driver.lock().await;
-                        let results = driver.query(&table_name).await?;
-                        let current_page = driver.get_current_pos(&table_name).await?;
+                        let results = driver.query(&table_name, limit).await?;
                         let _ = tx.send(Action::Db(DbAction::QueryTableComplete(
-                            table_name,
-                            results,
-                            current_page,
+                            table_name, results,
                         )));
 
                         eyre::Ok(())
@@ -409,20 +408,20 @@ impl App {
                 }
                 Err(err) => self.update(Action::App(AppAction::ReportError(err))),
             },
-            DbAction::QueryTableComplete(table_name, results, current_pos) => {
+            DbAction::QueryTableComplete(table_name, results) => {
                 self.selected_table = Some(table_name.clone());
 
                 let rows_fetched = results.rows.len();
                 self.table_model.query_result = results;
 
+                self.table_model.current_page = 0;
                 self.table_model.table_name = table_name.clone();
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                self.table_model.current_pos = current_pos;
-                self.table_model.table_state.select(Some(0));
+                self.table_model.ratatui_table_state.select(Some(0));
                 self.table_model.current_page = 0;
 
                 let msg = format!("Fetched {} rows", rows_fetched);
-                self.report_message(msg, MsgKind::Neutral, MsgLifetime::Short);
+                self.report_message(&msg, MsgKind::Neutral, MsgLifetime::Short);
             }
             DbAction::NextPage => {
                 if let Some(selected_table) = self.selected_table.clone() {
@@ -431,19 +430,13 @@ impl App {
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
                     let table_name = selected_table.clone();
+                    let limit = self.table_model.page_size;
 
                     tokio::spawn(async move {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
-                            if let Some(results) = driver.next_page(&table_name).await? {
-                                let current_pos = driver.get_current_pos(&table_name).await?;
-                                let current_page = driver.get_current_page();
-                                let _ = tx.send(Action::Db(DbAction::NextPageComplete(
-                                    table_name,
-                                    results,
-                                    current_pos,
-                                    current_page,
-                                )));
+                            if let Some(results) = driver.next_page(&table_name, limit).await? {
+                                let _ = tx.send(Action::Db(DbAction::NextPageComplete(results)));
                             }
 
                             eyre::Ok(())
@@ -458,12 +451,10 @@ impl App {
                     });
                 }
             }
-            DbAction::NextPageComplete(table_name, results, current_pos, current_page) => {
+            DbAction::NextPageComplete(results) => {
                 self.table_model.query_result = results;
-                self.table_model.table_name = table_name;
+                self.table_model.current_page += 1;
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                self.table_model.current_pos = current_pos;
-                self.table_model.current_page = current_page;
                 self.table_model.reset_ui(Some(0));
 
                 self.update(Action::App(AppAction::StopLoading));
@@ -475,20 +466,14 @@ impl App {
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
                     let table_name = selected_table.clone();
+                    let limit = self.table_model.page_size;
 
                     tokio::spawn(async move {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
-                            driver.prev_page(&table_name).await?;
-                            let results = driver.query(&table_name).await?;
-                            let current_pos = driver.get_current_pos(&table_name).await?;
-                            let current_page = driver.get_current_page();
-                            let _ = tx.send(Action::Db(DbAction::PrevPageComplete(
-                                table_name,
-                                results,
-                                current_pos,
-                                current_page,
-                            )));
+                            driver.prev_page(limit).await?;
+                            let results = driver.query(&table_name, limit).await?;
+                            let _ = tx.send(Action::Db(DbAction::PrevPageComplete(results)));
 
                             eyre::Ok(())
                         }
@@ -502,13 +487,20 @@ impl App {
                     });
                 }
             }
-            DbAction::PrevPageComplete(table_name, results, current_pos, current_page) => {
+            DbAction::PrevPageComplete(results) => {
                 self.table_model.query_result = results;
-                self.table_model.table_name = table_name;
+                self.table_model.current_page = self.table_model.current_page.saturating_sub(1);
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
-                self.table_model.current_pos = current_pos;
-                self.table_model.current_page = current_page;
                 self.table_model.reset_ui(Some(0));
+
+                self.update(Action::App(AppAction::StopLoading));
+            }
+            DbAction::GotoPageComplete(results, page) => {
+                self.table_model.query_result = results;
+                self.table_model.current_page = page.saturating_sub(1);
+                self.table_model.results_row_count = self.table_model.query_result.rows.len();
+                self.table_model.reset_ui(Some(0));
+                self.focused_pane = Pane::Right;
 
                 self.update(Action::App(AppAction::StopLoading));
             }
@@ -521,8 +513,14 @@ impl App {
                 let cmd = std::mem::take(&mut self.statusline_model.cmd.text);
                 self.statusline_model.cmd.cursor = 0;
 
-                let action = self.evaluate_cmd(&cmd);
-                self.update(action);
+                let action = self.evaluate_action_from_cmd(&cmd);
+                match action {
+                    Ok(action) => self.update(action),
+                    Err(err) => {
+                        self.report_message(&err.to_string(), MsgKind::Error, MsgLifetime::Short);
+                        self.focused_pane = Pane::Left;
+                    }
+                }
             }
             CmdLineAction::AddChar(character) => {
                 if character == ' ' && self.statusline_model.cmd.text.is_empty() {
@@ -555,9 +553,40 @@ impl App {
         }
     }
 
-    fn update_cmd(&mut self, action: CmdAction) {
+    fn update_cmd(&mut self, action: Cmd) {
         match action {
-            CmdAction::Count => self.update(Action::Db(DbAction::QueryCount)),
+            Cmd::Count => self.update(Action::Db(DbAction::QueryCount)),
+            Cmd::Goto(cmd) => match cmd {
+                GotoCmd::Page(page) => match &self.selected_table {
+                    Some(table) => {
+                        let db_driver = self.db_driver.clone();
+                        let tx = self.action_tx.clone();
+                        let table = table.clone();
+                        let limit = self.table_model.page_size;
+                        tokio::spawn(async move {
+                            let res: Result<()> = async {
+                                let mut driver = db_driver.lock().await;
+
+                                if let Some(results) = driver.goto_page(page, &table.clone(), limit).await? {
+                                    let _ = tx.send(Action::Db(DbAction::GotoPageComplete(results, page)));
+                                }
+
+                                eyre::Ok(())
+                            }
+                            .await;
+
+                            if let Err(err) = res {
+                                let _ = tx.send(Action::App(AppAction::ReportError(err)));
+                            }
+                        });
+                    }
+                    None => self.report_message(
+                        "No table is current selected",
+                        MsgKind::Error,
+                        MsgLifetime::Short,
+                    ),
+                },
+            },
         };
     }
 
