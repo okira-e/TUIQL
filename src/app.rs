@@ -223,6 +223,7 @@ impl App {
             Cmd::Quit => Ok(Action::App(AppAction::Quit)),
             Cmd::Count => Ok(Action::Cmd(AppCmd::Count)),
             Cmd::Goto(sub_cmd) => Ok(Action::Cmd(AppCmd::Goto(sub_cmd))),
+            Cmd::Sort(column, direction) => Ok(Action::Cmd(AppCmd::Sort(column, direction.into()))),
         };
     }
 }

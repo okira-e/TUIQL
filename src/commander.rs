@@ -2,17 +2,24 @@ use color_eyre::eyre::Result;
 use color_eyre::eyre::bail;
 use std::str::SplitWhitespace;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Cmd {
     Quit,
     /// Returns the total count of the currently selected table
     Count,
     Goto(GotoCmd),
+    Sort(String, SortCmdDirection),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum GotoCmd {
     Page(usize),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SortCmdDirection {
+    Asc,
+    Desc,
 }
 
 pub fn parse_cmd(input: &str) -> Result<Cmd> {
@@ -24,6 +31,7 @@ pub fn parse_cmd(input: &str) -> Result<Cmd> {
             "quit" | "q" => Ok(Cmd::Quit),
             "count" | "c" => Ok(Cmd::Count),
             "goto" | "g" => parse_goto_cmd(&mut iter),
+            "sort" | "s" => parse_sort_cmd(&mut iter),
             _ => bail!("Unknown command: {}", cmd),
         },
         None => bail!("Empty command"),
@@ -31,27 +39,42 @@ pub fn parse_cmd(input: &str) -> Result<Cmd> {
 }
 
 fn parse_goto_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
-    let cmd = iter.next();
-    return match cmd {
-        Some(cmd) => match cmd {
-            "page" | "p" => parse_goto_arg_cmd(iter),
-            _ => bail!("Unknown goto sub-command: {}", cmd),
+    return match iter.next() {
+        Some(sub_cmd) => match sub_cmd {
+            "page" | "p" => match iter.next() {
+                Some(arg) => {
+                    if let Ok(page_num) = arg.parse::<usize>() {
+                        Ok(Cmd::Goto(GotoCmd::Page(page_num)))
+                    } else {
+                        bail!("Invalid page number: {}", arg)
+                    }
+                }
+                None => bail!("Missing page number argument"),
+            },
+            _ => bail!("Unknown goto sub-command: {}", sub_cmd),
         },
         None => bail!("Missing goto sub-command"),
     };
 }
 
-fn parse_goto_arg_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
-    let arg = iter.next();
-    return match arg {
-        Some(arg) => {
-            if let Ok(page_num) = arg.parse::<usize>() {
-                Ok(Cmd::Goto(GotoCmd::Page(page_num)))
-            } else {
-                bail!("Invalid page number: {}", arg)
+fn parse_sort_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
+    let default_sort_direction = SortCmdDirection::Asc;
+
+    let column = iter.next();
+    return match column {
+        Some(column) => match iter.next() {
+            Some(direction_str) => {
+                let direction = match direction_str {
+                    "asc" => SortCmdDirection::Asc,
+                    "desc" => SortCmdDirection::Desc,
+                    _ => bail!("Sort directions: asc, desc"),
+                };
+
+                Ok(Cmd::Sort(column.to_string(), direction))
             }
-        }
-        None => bail!("Missing page number argument"),
+            None => Ok(Cmd::Sort(column.to_string(), default_sort_direction)),
+        },
+        None => bail!("Sort command requires a column name as an argument"),
     };
 }
 
@@ -93,6 +116,16 @@ mod tests {
         let result = parse_cmd("goto page");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Missing page number argument"));
+    }
+
+    #[test]
+    fn test_parse_sort_command() {
+        let result = parse_cmd("sort id desc");
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            Cmd::Sort(String::from("id"), SortCmdDirection::Desc)
+        );
     }
 
     #[test]

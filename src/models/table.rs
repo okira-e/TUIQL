@@ -1,4 +1,5 @@
 use crate::drivers::ColumnMetadata;
+use crate::drivers::OrderBy;
 use crate::drivers::QueryResult;
 use ratatui::layout::Constraint;
 use ratatui::widgets::TableState;
@@ -7,10 +8,10 @@ use serde_json::Value;
 #[derive(Debug)]
 pub struct TableModel {
     pub table_name: String,
+    pub query_state: QueryState,
     pub query_result: QueryResult,
     pub results_row_count: usize,
     pub total_count: Option<usize>,
-    pub page_size: usize,
     /// Dictates how many columns to skip horizontally
     pub horizontal_scroll_offset: usize,
     pub ratatui_table_state: TableState,
@@ -21,10 +22,10 @@ impl Default for TableModel {
     fn default() -> Self {
         Self {
             table_name: Default::default(),
+            query_state: Default::default(),
             query_result: QueryResult::default(),
             results_row_count: Default::default(),
             total_count: Default::default(),
-            page_size: 200,
             horizontal_scroll_offset: Default::default(),
             ratatui_table_state: Default::default(),
             current_page: Default::default(),
@@ -80,5 +81,18 @@ impl TableModel {
                 return Some(self.query_result.rows[pos].clone());
             }
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct QueryState {
+    pub offset: usize,
+    pub limit: usize,
+    pub order_by: Option<OrderBy>,
+}
+
+impl Default for QueryState {
+    fn default() -> Self {
+        Self { offset: 0, limit: 200, order_by: Default::default() }
     }
 }

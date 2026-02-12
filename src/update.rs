@@ -67,15 +67,10 @@ impl App {
             AppAction::SelectTable(name) => {
                 self.table_model.reset_ui(Some(0));
                 self.table_model.total_count = None;
+                self.table_model.query_state = Default::default();
                 self.focused_pane = Pane::Right;
 
-                let driver = self.db_driver.clone();
-                let tx = self.action_tx.clone();
-
-                tokio::spawn(async move {
-                    driver.lock().await.reset_query_state();
-                    let _ = tx.send(Action::Db(DbAction::QueryTable(name)));
-                });
+                let _ = self.action_tx.send(Action::Db(DbAction::QueryTable(name)));
             }
             AppAction::Resize(w, h) => {
                 self.area.width = w;
@@ -344,12 +339,14 @@ impl App {
                 // Spawn background task to query
                 let driver = self.db_driver.clone();
                 let tx = self.action_tx.clone();
-                let limit = self.table_model.page_size;
+                let order_by = self.table_model.query_state.order_by.clone();
+                let offset = self.table_model.query_state.offset;
+                let limit = self.table_model.query_state.limit;
 
                 tokio::spawn(async move {
                     let res: Result<()> = async {
                         let mut driver = driver.lock().await;
-                        let results = driver.query(&table_name, limit).await?;
+                        let results = driver.query(&table_name, order_by, offset, limit).await?;
                         let _ = tx.send(Action::Db(DbAction::QueryTableComplete(
                             table_name, results,
                         )));
@@ -388,7 +385,7 @@ impl App {
                 }
                 None => {
                     self.report_message(
-                        "No table is current selected",
+                        "No table is currently selected",
                         MsgKind::Error,
                         MsgLifetime::Short,
                     );
@@ -429,13 +426,19 @@ impl App {
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
                     let table_name = selected_table.clone();
-                    let limit = self.table_model.page_size;
+                    let order_by = self.table_model.query_state.order_by.clone();
+                    let mut offset = self.table_model.query_state.offset;
+                    let limit = self.table_model.query_state.limit;
 
                     tokio::spawn(async move {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
-                            if let Some(results) = driver.next_page(&table_name, limit).await? {
-                                let _ = tx.send(Action::Db(DbAction::NextPageComplete(results)));
+                            offset += limit; // new offset
+                            let results = driver.query(&table_name, order_by, offset, limit).await?;
+                            if !results.rows.is_empty() {
+                                let _ = tx.send(Action::Db(DbAction::NextPageComplete(results, offset)));
+                            } else {
+                                offset -= limit; // There is no next page. Reset the offset and send it back
                             }
 
                             eyre::Ok(())
@@ -450,9 +453,10 @@ impl App {
                     });
                 }
             }
-            DbAction::NextPageComplete(results) => {
+            DbAction::NextPageComplete(results, new_offset) => {
                 self.table_model.query_result = results;
                 self.table_model.current_page += 1;
+                self.table_model.query_state.offset = new_offset;
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
                 self.table_model.reset_ui(Some(0));
 
@@ -460,18 +464,25 @@ impl App {
             }
             DbAction::PrevPage => {
                 if let Some(selected_table) = self.selected_table.clone() {
+                    if self.table_model.current_page == 0 {
+                        return;
+                    }
+
                     self.update(Action::App(AppAction::StartLoading));
 
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
                     let table_name = selected_table.clone();
-                    let limit = self.table_model.page_size;
+                    let order_by = self.table_model.query_state.order_by.clone();
+                    let mut offset = self.table_model.query_state.offset;
+                    let limit = self.table_model.query_state.limit;
 
                     tokio::spawn(async move {
                         let res: Result<()> = async {
+                            offset = offset.saturating_sub(limit);
+
                             let mut driver = driver.lock().await;
-                            driver.prev_page(limit).await?;
-                            let results = driver.query(&table_name, limit).await?;
+                            let results = driver.query(&table_name, order_by, offset, limit).await?;
                             let _ = tx.send(Action::Db(DbAction::PrevPageComplete(results)));
 
                             eyre::Ok(())
@@ -494,9 +505,10 @@ impl App {
 
                 self.update(Action::App(AppAction::StopLoading));
             }
-            DbAction::GotoPageComplete(results, page) => {
+            DbAction::GotoPageComplete(results, page, offset) => {
                 self.table_model.query_result = results;
                 self.table_model.current_page = page.saturating_sub(1);
+                self.table_model.query_state.offset = offset;
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
                 self.table_model.reset_ui(Some(0));
                 self.focused_pane = Pane::Right;
@@ -555,18 +567,35 @@ impl App {
     fn update_cmd(&mut self, action: AppCmd) {
         match action {
             AppCmd::Count => self.update(Action::Db(DbAction::QueryCount)),
-            AppCmd::Goto(cmd) => match cmd {
+            AppCmd::Goto(sub_cmd) => match sub_cmd {
                 GotoCmd::Page(page) => match self.selected_table.clone() {
                     Some(table) => {
                         let db_driver = self.db_driver.clone();
                         let tx = self.action_tx.clone();
-                        let limit = self.table_model.page_size;
+                        let order_by = self.table_model.query_state.order_by.clone();
+                        let mut offset = self.table_model.query_state.offset;
+                        let limit = self.table_model.query_state.limit;
+
                         tokio::spawn(async move {
                             let res: Result<()> = async {
                                 let mut driver = db_driver.lock().await;
 
-                                if let Some(results) = driver.goto_page(page, &table.clone(), limit).await? {
-                                    let _ = tx.send(Action::Db(DbAction::GotoPageComplete(results, page)));
+                                let app_page = page.saturating_sub(1);
+                                let new_offset = app_page * limit;
+                                let old_offset = offset;
+                                if new_offset != old_offset {
+                                    // Fetch with the new offset and commit the new offset and page if there are results.
+                                    offset = new_offset;
+
+                                    let results = driver.query(&table, order_by, offset, limit).await?;
+
+                                    if !results.rows.is_empty() {
+                                        let _ = tx.send(Action::Db(DbAction::GotoPageComplete(
+                                            results, page, offset,
+                                        )));
+                                    } else {
+                                        offset = old_offset;
+                                    }
                                 }
 
                                 eyre::Ok(())
@@ -578,13 +607,19 @@ impl App {
                             }
                         });
                     }
-                    None => self.report_message(
-                        "No table is current selected",
-                        MsgKind::Error,
-                        MsgLifetime::Short,
-                    ),
+                    None => {
+                        self.report_message(
+                            "No table is currently selected",
+                            MsgKind::Error,
+                            MsgLifetime::Short,
+                        );
+                        self.focused_pane = Pane::Left;
+                    }
                 },
             },
+            AppCmd::Sort(column, direction) => {
+                panic!("SORTING: {:?} - {:?}", column, direction);
+            }
         };
     }
 

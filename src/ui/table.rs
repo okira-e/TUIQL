@@ -47,7 +47,7 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
     //
 
     if let Some(total_count) = model.total_count {
-        let total_pages = (total_count as f64 / model.page_size as f64).ceil();
+        let total_pages = (total_count as f64 / model.query_state.limit as f64).ceil();
 
         container_block = container_block
             .title_bottom(

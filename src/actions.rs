@@ -1,4 +1,5 @@
 use crate::commander::GotoCmd;
+use crate::drivers::OrderByDirection;
 use crate::drivers::QueryResult;
 use crate::models::statusline::MsgKind;
 use crate::models::statusline::MsgLifetime;
@@ -64,10 +65,10 @@ pub enum DbAction {
     QueryCountComplete(Result<usize>),
     QueryTableComplete(String, QueryResult),
     NextPage,
-    NextPageComplete(QueryResult),
+    NextPageComplete(QueryResult, usize),
     PrevPage,
     PrevPageComplete(QueryResult),
-    GotoPageComplete(QueryResult, usize),
+    GotoPageComplete(QueryResult, usize, usize),
 }
 
 #[derive(Debug)]
@@ -91,4 +92,5 @@ pub enum CmdLineAction {
 pub enum AppCmd {
     Count,
     Goto(GotoCmd),
+    Sort(String, OrderByDirection),
 }
