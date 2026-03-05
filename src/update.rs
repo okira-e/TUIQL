@@ -60,17 +60,16 @@ impl App {
             }
             AppAction::CyclePane => match focused_view {
                 View::Explorer => {
-                    self.focused_pane = Pane::Right;
+                    self.focus_pane(Pane::Right);
                 }
                 _ => {
-                    self.focused_pane = Pane::Left;
+                    self.focus_pane(Pane::Left);
                 }
             },
             AppAction::SelectTable(name) => {
                 self.table_model.reset_ui(Some(0));
                 self.table_model.total_count = None;
                 self.table_model.query_state = Default::default();
-                self.focused_pane = Pane::Right;
 
                 let _ = self.action_tx.send(Action::Db(DbAction::QueryTable(name)));
             }
@@ -93,7 +92,7 @@ impl App {
             }
             AppAction::SetCommandMode => {
                 self.statusline_model.mode = StatusLineMode::Command;
-                self.focused_pane = Pane::StatusLine;
+                self.focus_pane(Pane::StatusLine);
             }
             AppAction::CloseJsonView => {
                 self.right_view = RightView::ResultsTable;
@@ -383,7 +382,7 @@ impl App {
                         let _ = tx.send(Action::App(AppAction::StopLoading));
                         let _ = tx.send(Action::Db(DbAction::QueryCountComplete(res)));
                     });
-                    self.focused_pane = Pane::Right;
+                    self.focus_pane(Pane::Right);
                 }
                 None => {
                     self.report_message(
@@ -391,7 +390,7 @@ impl App {
                         MsgKind::Error,
                         MsgLifetime::Short,
                     );
-                    self.focused_pane = Pane::Left;
+                    self.focus_pane(Pane::Left);
                 }
             },
             DbAction::QueryCountComplete(res) => match res {
@@ -417,6 +416,7 @@ impl App {
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
                 self.table_model.ratatui_table_state.select(Some(0));
                 self.table_model.current_page = 0;
+                self.focus_pane(Pane::Right);
 
                 let msg = format!("Fetched {} rows", rows_fetched);
                 self.report_message(&msg, MsgKind::Neutral, MsgLifetime::Short);
@@ -514,7 +514,7 @@ impl App {
                 self.table_model.query_state.offset = offset;
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
                 self.table_model.reset_ui(Some(0));
-                self.focused_pane = Pane::Right;
+                self.focus_pane(Pane::Right);
 
                 self.update(Action::App(AppAction::StopLoading));
             }
@@ -532,7 +532,7 @@ impl App {
                     Ok(action) => self.update(action),
                     Err(err) => {
                         self.report_message(&err.to_string(), MsgKind::Error, MsgLifetime::Short);
-                        self.focused_pane = Pane::Left;
+                        self.focus_pane(Pane::Left);
                     }
                 }
             }
@@ -561,7 +561,7 @@ impl App {
                 self.statusline_model.cmd.cursor = new_pos.min(self.statusline_model.cmd.text.len());
             }
             CmdLineAction::Exit => {
-                self.focused_pane = Pane::Left;
+                self.focus_pane(self.prev_pane);
                 self.statusline_model = StatusLineModel::default();
             }
         }
@@ -616,7 +616,7 @@ impl App {
                             MsgKind::Error,
                             MsgLifetime::Short,
                         );
-                        self.focused_pane = Pane::Left;
+                        self.focus_pane(Pane::Left);
                     }
                 },
             },
@@ -624,13 +624,15 @@ impl App {
                 Some(table) => {
                     self.update(Action::App(AppAction::StartLoading));
 
-                    let order_by = OrderBy::new(vec![column], direction);
-                    self.table_model.query_state.order_by = Some(order_by.clone());
+                    let order_by = match column {
+                        Some(col) => Some(OrderBy::new(vec![col], direction)),
+                        None => None,
+                    };
+                    self.table_model.query_state.order_by = order_by.clone();
                     self.table_model.query_state.offset = 0;
 
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
-                    let order_by = Some(order_by);
                     let limit = self.table_model.query_state.limit;
 
                     tokio::spawn(async move {
@@ -656,7 +658,45 @@ impl App {
                         MsgKind::Error,
                         MsgLifetime::Short,
                     );
-                    self.focused_pane = Pane::Left;
+                    self.focus_pane(Pane::Left);
+                }
+            },
+            AppCmd::Limit(limit) => match self.selected_table.clone() {
+                Some(table) => {
+                    self.update(Action::App(AppAction::StartLoading));
+
+                    self.table_model.query_state.limit = limit;
+                    self.table_model.query_state.offset = 0;
+                    self.table_model.current_page = 0;
+
+                    let driver = self.db_driver.clone();
+                    let tx = self.action_tx.clone();
+                    let order_by = self.table_model.query_state.order_by.clone();
+
+                    tokio::spawn(async move {
+                        let res: Result<()> = async {
+                            let mut driver = driver.lock().await;
+                            let results = driver.query(&table, order_by, 0, limit).await?;
+                            let _ = tx.send(Action::Db(DbAction::QueryTableComplete(table, results)));
+
+                            eyre::Ok(())
+                        }
+                        .await;
+
+                        let _ = tx.send(Action::App(AppAction::StopLoading));
+
+                        if let Err(err) = res {
+                            let _ = tx.send(Action::App(AppAction::ReportError(err)));
+                        }
+                    });
+                }
+                None => {
+                    self.table_model.query_state.limit = limit;
+                    self.report_message(
+                        &format!("Limit set to {}", limit),
+                        MsgKind::Neutral,
+                        MsgLifetime::Short,
+                    );
                 }
             },
         };

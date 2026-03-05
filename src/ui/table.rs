@@ -98,24 +98,27 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
 
     let visible_rows = model.query_result.rows.clone();
     let mut table_rows: Vec<Row> = vec![];
-    for row in visible_rows.iter() {
+    for (row_index, row) in visible_rows.iter().enumerate() {
         let row_map = row.as_object().unwrap();
 
         let mut values = vec![];
+        let row_style = if row_index % 2 == 0 {
+            Style::default()
+        } else {
+            Style::default().bg(theme.highlight)
+        };
         for key in visible_cols.iter() {
             let cell = match row_map[&key.name].clone() {
-                Value::Null => {
-                    Cell::from("null").style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC))
+                Value::Null => Cell::from(" null").style(row_style.fg(Color::DarkGray).add_modifier(Modifier::ITALIC)),
+                Value::Bool(b) => Cell::from(format!(" {}", b.to_string())).style(row_style.fg(Color::Yellow)),
+                Value::Number(number) => {
+                    Cell::from(format!(" {}", number.to_string())).style(row_style.fg(Color::Cyan))
                 }
-                Value::Bool(b) => Cell::from(b.to_string()).style(Style::default().fg(Color::Yellow)),
-                Value::Number(number) => Cell::from(number.to_string()).style(Style::default().fg(Color::Cyan)),
-                Value::String(s) => Cell::from(s.clone()).style(theme.fg),
+                Value::String(s) => Cell::from(format!(" {}", s.clone())).style(row_style.patch(theme.fg)),
                 Value::Array(values) => {
-                    Cell::from(format!("[{} items]", values.len())).style(Style::default().fg(Color::Magenta))
+                    Cell::from(format!("[{} items]", values.len())).style(row_style.fg(Color::Magenta))
                 }
-                Value::Object(map) => {
-                    Cell::from(format!("{{{} keys}}", map.len())).style(Style::default().fg(Color::Blue))
-                }
+                Value::Object(map) => Cell::from(format!("{{{} keys}}", map.len())).style(row_style.fg(Color::Blue)),
             };
 
             values.push(cell);
@@ -132,12 +135,13 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
                 .bottom_margin(1), // Space between header and rows
         )
         .row_highlight_style(if focused {
-            Style::default().bg(theme.highlight).add_modifier(Modifier::BOLD)
+            Style::default().fg(theme.selection).add_modifier(Modifier::BOLD)
         } else {
             Style::default()
         })
         .widths(widths)
-        .highlight_symbol("> ");
+        .highlight_symbol("> ")
+        .column_spacing(0);
 
     frame.render_stateful_widget(table, table_area, &mut model.ratatui_table_state);
 

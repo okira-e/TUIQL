@@ -94,7 +94,8 @@ pub enum CmdLineAction {
 pub enum AppCmd {
     Count,
     Goto(GotoCmd),
-    Sort(String, OrderByDirection),
+    Sort(Option<String>, OrderByDirection),
+    Limit(usize),
 }
 
 // Implementing this so that we don't get the entire result object in the log file with enum variants

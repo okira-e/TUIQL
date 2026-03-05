@@ -8,7 +8,8 @@ pub enum Cmd {
     /// Returns the total count of the currently selected table
     Count,
     Goto(GotoCmd),
-    Sort(String, SortCmdDirection),
+    Sort(Option<String>, SortCmdDirection),
+    Limit(usize),
 }
 
 #[derive(Debug, PartialEq)]
@@ -32,6 +33,7 @@ pub fn parse_cmd(input: &str) -> Result<Cmd> {
             "count" | "c" => Ok(Cmd::Count),
             "goto" | "g" => parse_goto_cmd(&mut iter),
             "sort" | "s" => parse_sort_cmd(&mut iter),
+            "limit" | "l" => parse_limit_cmd(&mut iter),
             _ => bail!("Unknown command: {}", cmd),
         },
         None => bail!("Empty command"),
@@ -70,11 +72,27 @@ fn parse_sort_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
                     _ => bail!("Sort directions: asc, desc"),
                 };
 
-                Ok(Cmd::Sort(column.to_string(), direction))
+                Ok(Cmd::Sort(Some(column.to_string()), direction))
             }
-            None => Ok(Cmd::Sort(column.to_string(), default_sort_direction)),
+            None => Ok(Cmd::Sort(Some(column.to_string()), default_sort_direction)),
         },
-        None => bail!("Sort command requires a column name as an argument"),
+        None => Ok(Cmd::Sort(None, SortCmdDirection::Asc)),
+    };
+}
+
+fn parse_limit_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
+    return match iter.next() {
+        Some(arg) => {
+            if let Ok(limit) = arg.parse::<usize>() {
+                if limit == 0 {
+                    bail!("Limit must be greater than 0");
+                }
+                Ok(Cmd::Limit(limit))
+            } else {
+                bail!("Invalid limit: {}", arg)
+            }
+        }
+        None => bail!("Limit command requires a number as an argument"),
     };
 }
 
@@ -124,7 +142,7 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            Cmd::Sort(String::from("id"), SortCmdDirection::Desc)
+            Cmd::Sort(Some(String::from("id")), SortCmdDirection::Desc)
         );
     }
 

@@ -80,6 +80,7 @@ pub struct App {
     pub selected_table: Option<String>,
     pub area: Rect,
     pub is_loading: bool,
+    pub prev_pane: Pane,
 }
 
 impl App {
@@ -107,6 +108,7 @@ impl App {
             json_view_model: JsonViewModel::default(),
             area: Rect::default(),
             is_loading: false,
+            prev_pane: Pane::Left,
         };
     }
 
@@ -224,6 +226,12 @@ impl App {
             Cmd::Count => Ok(Action::Cmd(AppCmd::Count)),
             Cmd::Goto(sub_cmd) => Ok(Action::Cmd(AppCmd::Goto(sub_cmd))),
             Cmd::Sort(column, direction) => Ok(Action::Cmd(AppCmd::Sort(column, direction.into()))),
+            Cmd::Limit(limit) => Ok(Action::Cmd(AppCmd::Limit(limit))),
         };
+    }
+
+    pub fn focus_pane(&mut self, pane: Pane) {
+        self.prev_pane = self.focused_pane;
+        self.focused_pane = pane;
     }
 }
