@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::commander::GotoCmd;
 use crate::drivers::OrderByDirection;
 use crate::drivers::QueryResult;
@@ -58,7 +60,6 @@ pub enum ResultsTableAction {
     YankSelection,
 }
 
-#[derive(Debug)]
 pub enum DbAction {
     QueryTable(String),
     QueryCount,
@@ -67,7 +68,7 @@ pub enum DbAction {
     NextPage,
     NextPageComplete(QueryResult, usize),
     PrevPage,
-    PrevPageComplete(QueryResult),
+    PrevPageComplete(QueryResult, usize),
     GotoPageComplete(QueryResult, usize, usize),
 }
 
@@ -93,4 +94,36 @@ pub enum AppCmd {
     Count,
     Goto(GotoCmd),
     Sort(String, OrderByDirection),
+}
+
+// Implementing this so that we don't get the entire result object in the log file with enum variants
+// that have QueryResult in their payloads
+impl fmt::Debug for DbAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DbAction::QueryTable(s) => f.debug_tuple("QueryTable").field(s).finish(),
+            DbAction::QueryCount => f.write_str("QueryCount"),
+            DbAction::QueryCountComplete(r) => f.debug_tuple("QueryCountComplete").field(r).finish(),
+
+            DbAction::QueryTableComplete(name, _) => f
+                .debug_tuple("QueryTableComplete")
+                .field(name)
+                .field(&"<QueryResult>")
+                .finish(),
+            DbAction::NextPage => f.write_str("NextPage"),
+            DbAction::NextPageComplete(_, page) => f
+                .debug_tuple("NextPageComplete")
+                .field(&"<QueryResult>")
+                .field(page)
+                .finish(),
+            DbAction::PrevPage => f.write_str("PrevPage"),
+            DbAction::PrevPageComplete(_, offset) => f.debug_tuple("PrevPageComplete").field(&"<QueryResult>").field(offset).finish(),
+            DbAction::GotoPageComplete(_, page, total) => f
+                .debug_tuple("GotoPageComplete")
+                .field(&"<QueryResult>")
+                .field(page)
+                .field(total)
+                .finish(),
+        }
+    }
 }

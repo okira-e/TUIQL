@@ -483,7 +483,7 @@ impl App {
 
                             let mut driver = driver.lock().await;
                             let results = driver.query(&table_name, order_by, offset, limit).await?;
-                            let _ = tx.send(Action::Db(DbAction::PrevPageComplete(results)));
+                            let _ = tx.send(Action::Db(DbAction::PrevPageComplete(results, offset)));
 
                             eyre::Ok(())
                         }
@@ -497,9 +497,10 @@ impl App {
                     });
                 }
             }
-            DbAction::PrevPageComplete(results) => {
+            DbAction::PrevPageComplete(results, new_offset) => {
                 self.table_model.query_result = results;
                 self.table_model.current_page = self.table_model.current_page.saturating_sub(1);
+                self.table_model.query_state.offset = new_offset;
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
                 self.table_model.reset_ui(Some(0));
 

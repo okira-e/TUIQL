@@ -121,7 +121,7 @@ impl App {
         let driver = self.db_driver.lock().await;
         let tables: Vec<String> = driver.get_tables().await?;
         let views: Vec<String> = driver.get_views().await?;
-        let materizlied: Vec<String> = driver.get_mateialized_views().await?;
+        let materialized: Vec<String> = driver.get_mateialized_views().await?;
         drop(driver); // unlock the mutex
 
         let tables: Vec<ExplorerItem> = tables
@@ -136,7 +136,7 @@ impl App {
             .map(|(i, name)| ExplorerItem { name: name.clone(), kind: ExplorerItemKind::View, index: i })
             .collect();
 
-        let materialized: Vec<ExplorerItem> = materizlied
+        let materialized: Vec<ExplorerItem> = materialized
             .iter()
             .enumerate()
             .map(|(i, name)| ExplorerItem {
