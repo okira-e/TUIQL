@@ -79,6 +79,7 @@ pub enum JsonViewAction {
     GoToFirst,
 }
 
+/// This is key actions for the statusline when the user has it on focus.
 #[derive(Debug)]
 pub enum CmdLineAction {
     AddChar(char),

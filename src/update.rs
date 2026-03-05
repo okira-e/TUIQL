@@ -11,6 +11,7 @@ use crate::app::Pane;
 use crate::app::RightView;
 use crate::app::View;
 use crate::commander::GotoCmd;
+use crate::drivers::OrderBy;
 use crate::models::explorer::ExplorerItemKind;
 use crate::models::statusline::MsgKind;
 use crate::models::statusline::MsgLifetime;
@@ -57,13 +58,14 @@ impl App {
                     }
                 }
             }
-            AppAction::CyclePane => {
-                if focused_view == View::Explorer {
+            AppAction::CyclePane => match focused_view {
+                View::Explorer => {
                     self.focused_pane = Pane::Right;
-                } else {
+                }
+                _ => {
                     self.focused_pane = Pane::Left;
                 }
-            }
+            },
             AppAction::SelectTable(name) => {
                 self.table_model.reset_ui(Some(0));
                 self.table_model.total_count = None;
@@ -618,9 +620,45 @@ impl App {
                     }
                 },
             },
-            AppCmd::Sort(column, direction) => {
-                panic!("SORTING: {:?} - {:?}", column, direction);
-            }
+            AppCmd::Sort(column, direction) => match self.selected_table.clone() {
+                Some(table) => {
+                    self.update(Action::App(AppAction::StartLoading));
+
+                    let order_by = OrderBy::new(vec![column], direction);
+                    self.table_model.query_state.order_by = Some(order_by.clone());
+                    self.table_model.query_state.offset = 0;
+
+                    let driver = self.db_driver.clone();
+                    let tx = self.action_tx.clone();
+                    let order_by = Some(order_by);
+                    let limit = self.table_model.query_state.limit;
+
+                    tokio::spawn(async move {
+                        let res: Result<()> = async {
+                            let mut driver = driver.lock().await;
+                            let results = driver.query(&table, order_by, 0, limit).await?;
+                            let _ = tx.send(Action::Db(DbAction::QueryTableComplete(table, results)));
+
+                            eyre::Ok(())
+                        }
+                        .await;
+
+                        let _ = tx.send(Action::App(AppAction::StopLoading));
+
+                        if let Err(err) = res {
+                            let _ = tx.send(Action::App(AppAction::ReportError(err)));
+                        }
+                    });
+                }
+                None => {
+                    self.report_message(
+                        "No table is currently selected",
+                        MsgKind::Error,
+                        MsgLifetime::Short,
+                    );
+                    self.focused_pane = Pane::Left;
+                }
+            },
         };
     }
 

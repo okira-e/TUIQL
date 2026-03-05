@@ -70,6 +70,12 @@ pub struct OrderBy {
     order: OrderByDirection,
 }
 
+impl OrderBy {
+    pub fn new(columns: Vec<String>, order: OrderByDirection) -> Self {
+        Self { columns, order }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrderByDirection {
     Asc,
