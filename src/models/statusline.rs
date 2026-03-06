@@ -3,6 +3,7 @@ pub struct StatusLineModel {
     pub msg: StatusLineMsg,
     pub cmd: StatusLineCommand,
     pub spinner_animation_tick_count: usize,
+    pub history_cursor: usize,
 }
 
 impl StatusLineModel {
@@ -13,6 +14,7 @@ impl StatusLineModel {
             StatusLineMode::Command => {
                 self.cmd.cursor = 0;
                 self.cmd.text = String::new();
+                self.history_cursor = 0;
             }
         }
     }
@@ -25,6 +27,7 @@ impl Default for StatusLineModel {
             msg: StatusLineMsg::default(),
             cmd: StatusLineCommand::default(),
             spinner_animation_tick_count: 0,
+            history_cursor: 0,
         };
     }
 }

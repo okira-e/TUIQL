@@ -10,6 +10,7 @@ pub enum Cmd {
     Goto(GotoCmd),
     Sort(Option<String>, SortCmdDirection),
     Limit(usize),
+    RefreshTable,
 }
 
 #[derive(Debug, PartialEq)]
@@ -34,6 +35,7 @@ pub fn parse_cmd(input: &str) -> Result<Cmd> {
             "goto" | "g" => parse_goto_cmd(&mut iter),
             "sort" | "s" => parse_sort_cmd(&mut iter),
             "limit" | "l" => parse_limit_cmd(&mut iter),
+            "refresh" | "r" => Ok(Cmd::RefreshTable),
             _ => bail!("Unknown command: {}", cmd),
         },
         None => bail!("Empty command"),
@@ -89,11 +91,32 @@ fn parse_limit_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
                 }
                 Ok(Cmd::Limit(limit))
             } else {
-                bail!("Invalid limit: {}", arg)
+                match parse_metric(arg) {
+                    Some(l) => Ok(Cmd::Limit(l)),
+                    None => bail!("Invalid limit: {}", arg),
+                }
             }
         }
         None => bail!("Limit command requires a number as an argument"),
     };
+}
+
+// helper function
+fn parse_metric(input: &str) -> Option<usize> {
+    let (num, suffix) = input
+        .trim()
+        .split_at(input.find(|c: char| !c.is_ascii_digit()).unwrap_or(input.len()));
+
+    let n: f64 = num.parse().ok()?;
+
+    let multiplier = match suffix.to_ascii_lowercase().as_str() {
+        "" => 1.0,
+        "k" => 1e3,
+        "m" => 1e6,
+        _ => return None,
+    };
+
+    Some((n * multiplier) as usize)
 }
 
 #[cfg(test)]

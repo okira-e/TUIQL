@@ -11,6 +11,7 @@ use crate::app::Pane;
 use crate::app::RightView;
 use crate::app::View;
 use crate::commander::GotoCmd;
+use crate::config::project::append_history;
 use crate::drivers::OrderBy;
 use crate::models::explorer::ExplorerItemKind;
 use crate::models::statusline::MsgKind;
@@ -529,10 +530,19 @@ impl App {
 
                 let action = self.evaluate_app_action_from_cmd(&cmd);
                 match action {
-                    Ok(action) => self.update(action),
+                    Ok(action) => {
+                        self.update(action);
+                        self.statusline_model.mode = StatusLineMode::Status;
+                    }
                     Err(err) => {
                         self.report_message(&err.to_string(), MsgKind::Error, MsgLifetime::Short);
                         self.focus_pane(Pane::Left);
+                    }
+                };
+
+                if let Some(config) = self.config.as_mut() {
+                    if let Err(err) = append_history(config, cmd) {
+                        self.report_message(&err.to_string(), MsgKind::Error, MsgLifetime::Long);
                     }
                 }
             }
@@ -559,6 +569,56 @@ impl App {
             CmdLineAction::MoveRight => {
                 let new_pos = self.statusline_model.cmd.cursor + 1;
                 self.statusline_model.cmd.cursor = new_pos.min(self.statusline_model.cmd.text.len());
+            }
+            CmdLineAction::TogglePrevCommand => {
+                if let Some(config) = &self.config {
+                    // while loop for skipping/hopping two identical commands after each other.
+                    while self.statusline_model.history_cursor < config.commands.history.len() {
+                        let text = config
+                            .commands
+                            .history
+                            .get(self.statusline_model.history_cursor) // Starts at 0. Use before increment
+                            .unwrap()
+                            .clone();
+
+                        if text == self.statusline_model.cmd.text {
+                            self.statusline_model.history_cursor += 1;
+                            continue;
+                        }
+
+                        self.statusline_model.cmd.text = text;
+                        self.statusline_model.cmd.cursor = self.statusline_model.cmd.text.len();
+                        self.statusline_model.history_cursor += 1;
+                        break;
+                    }
+                }
+            }
+            CmdLineAction::ToggleNextCommand => {
+                if let Some(config) = &self.config {
+                    // while loop for skipping/hopping two identical commands after each other.
+                    while self.statusline_model.history_cursor != 0 {
+                        self.statusline_model.history_cursor -= 1;
+                        let text = config
+                            .commands
+                            .history
+                            .get(self.statusline_model.history_cursor.saturating_sub(1))
+                            .unwrap()
+                            .clone();
+
+                        if text == self.statusline_model.cmd.text {
+                            continue;
+                        }
+
+                        self.statusline_model.cmd.text = text;
+                        self.statusline_model.cmd.cursor = self.statusline_model.cmd.text.len();
+                        break;
+                    }
+
+                    if self.statusline_model.history_cursor == 0 {
+                        self.statusline_model.cmd.text = String::new();
+                        self.statusline_model.cmd.cursor = 0;
+                    }
+                }
             }
             CmdLineAction::Exit => {
                 self.focus_pane(self.prev_pane);

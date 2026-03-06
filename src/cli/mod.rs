@@ -3,8 +3,14 @@ use crate::app::App;
 use crate::cli::args::ConnectCmdArgs;
 use crate::cli::args::OpenCmdArgs;
 use crate::cli::args::SaveConnectionCmdArgs;
-use crate::config;
+use crate::config::connection::Connection;
+use crate::config::connection::add_connection;
+use crate::config::connection::load_connections;
+use crate::config::get_config_dir_path_based_on_os;
+use crate::config::project::load_project_config;
+use crate::config::settings::load_settings;
 use crate::drivers;
+use crate::drivers::DbDriver;
 use clap::Subcommand;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
@@ -19,14 +25,15 @@ pub enum Commands {
     /// Open a saved connection to a database.
     Open(OpenCmdArgs),
     /// List all saved connections.
-    ListConnections,
+    #[command(alias = "ls")]
+    List,
     ///  Save a new database connection.
-    AddConnection(SaveConnectionCmdArgs),
+    Add(SaveConnectionCmdArgs),
 }
 
 pub async fn run(args: args::AppArgs) -> Result<()> {
     if args.config_path {
-        let path = config::get_config_dir_path_based_on_os()?;
+        let path = get_config_dir_path_based_on_os()?;
 
         match path {
             Some(path) => println!("Config is at {}", path.display()),
@@ -53,30 +60,33 @@ async fn exec_command(command: Commands) -> Result<()> {
     return match command {
         Commands::Connect(args) => connect_directly(args).await,
         Commands::Open(args) => open_connection(args).await,
-        Commands::ListConnections => list_connections(),
-        Commands::AddConnection(args) => save_connection(args).await,
+        Commands::List => list_connections(),
+        Commands::Add(args) => save_connection(args).await,
     };
 }
 
-/// Connect to the database directly without saving/opening a project.
-async fn connect_directly(args: args::ConnectCmdArgs) -> Result<()> {
-    let db_driver = drivers::new_connection(args.r#type, &args.url).await?;
-
-    let settings = config::load_settings()?;
-
-    let mut app = App::new(settings, db_driver).await;
+async fn run_app(db_driver: Box<dyn DbDriver>, project_name: Option<&str>) -> Result<()> {
+    let settings = load_settings()?;
+    let project_config = match project_name {
+        None => None,
+        Some(proj) => Some(load_project_config(proj)?),
+    };
+    let mut app = App::new(settings, db_driver, project_config).await;
     app.init().await?;
     let terminal = ratatui::init();
     let result = app.run(terminal).await;
-
     ratatui::restore();
 
     return result;
 }
 
-/// Opens a previously saved database connection.
+async fn connect_directly(args: args::ConnectCmdArgs) -> Result<()> {
+    let db_driver = drivers::new_connection(args.r#type, &args.url).await?;
+    return run_app(db_driver, None).await;
+}
+
 async fn open_connection(args: args::OpenCmdArgs) -> Result<()> {
-    let connections = config::load_connections()?;
+    let connections = load_connections()?;
 
     let connection = match connections.iter().find(|c| c.name == args.connection_name) {
         Some(c) => c,
@@ -89,16 +99,7 @@ async fn open_connection(args: args::OpenCmdArgs) -> Result<()> {
     };
 
     let db_driver = drivers::new_connection(connection.kind, &connection.url).await?;
-
-    let settings = config::load_settings()?;
-    let mut app = App::new(settings, db_driver).await;
-    app.init().await?;
-    let terminal = ratatui::init();
-    let result = app.run(terminal).await;
-
-    ratatui::restore();
-
-    return result;
+    return run_app(db_driver, Some(&connection.name)).await;
 }
 
 async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
@@ -108,20 +109,20 @@ async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
         args.port,
         &args.user,
         &args.pass,
-        &args.db_name,
+        &args.database,
     )
     .await?;
 
-    let conn = config::Connection {
-        name: args.connection_name,
+    let conn = Connection {
+        name: args.name,
         kind: args.r#type,
         url: format!(
             "postgres://{}:{}@{}:{}/{}",
-            args.user, args.pass, args.host, args.port, args.db_name
+            args.user, args.pass, args.host, args.port, args.database
         ),
     };
 
-    config::add_connection(conn)?;
+    add_connection(conn)?;
 
     list_connections()?;
 
@@ -129,7 +130,7 @@ async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
 }
 
 fn list_connections() -> Result<()> {
-    let connections = config::load_connections()?;
+    let connections = load_connections()?;
 
     if connections.is_empty() {
         println!("No connections found.");

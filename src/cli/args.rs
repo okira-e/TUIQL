@@ -38,7 +38,7 @@ pub struct SaveConnectionCmdArgs {
     pub r#type: drivers::kinds::DbKind,
     /// The name of the connection to open.
     #[arg(long)]
-    pub connection_name: String,
+    pub name: String,
     /// The host of the database.
     #[arg(long)]
     pub host: String,
@@ -53,5 +53,5 @@ pub struct SaveConnectionCmdArgs {
     pub port: u16,
     /// The database name.
     #[arg(long)]
-    pub db_name: String,
+    pub database: String,
 }

@@ -173,8 +173,18 @@ impl App {
             },
 
             View::StatusLine => match (key.modifiers, key.code) {
-                (_, KeyCode::Char(c)) => {
-                    self.update(Action::CmdLine(CmdLineAction::AddChar(c)));
+                (_, KeyCode::Up) | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
+                    self.update(Action::CmdLine(CmdLineAction::TogglePrevCommand));
+                    return;
+                }
+
+                (_, KeyCode::Down) | (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
+                    self.update(Action::CmdLine(CmdLineAction::ToggleNextCommand));
+                    return;
+                }
+
+                (_, KeyCode::Esc) | (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
+                    self.update(Action::CmdLine(CmdLineAction::Exit));
                     return;
                 }
 
@@ -198,8 +208,8 @@ impl App {
                     return;
                 }
 
-                (_, KeyCode::Esc) => {
-                    self.update(Action::CmdLine(CmdLineAction::Exit));
+                (_, KeyCode::Char(c)) => {
+                    self.update(Action::CmdLine(CmdLineAction::AddChar(c)));
                     return;
                 }
 

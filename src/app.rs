@@ -1,9 +1,11 @@
 use crate::actions::Action;
 use crate::actions::AppAction;
 use crate::actions::AppCmd;
+use crate::actions::DbAction;
 use crate::commander::Cmd;
 use crate::commander::parse_cmd;
-use crate::config::Settings;
+use crate::config::project::ProjectConfig;
+use crate::config::settings::Settings;
 use crate::drivers;
 use crate::drivers::DbDriver;
 use crate::models::explorer::ExplorerItem;
@@ -70,6 +72,8 @@ pub struct App {
     pub statusline_model: StatusLineModel,
     pub json_view_model: JsonViewModel,
     pub settings: Settings,
+    /// None if the user connected directly without saving the connection.
+    pub config: Option<ProjectConfig>,
     /// Since the driver is behind a mutex, we get automatic serialization of requests that
     /// throttles database actions to just one at a time.
     ///
@@ -84,13 +88,14 @@ pub struct App {
 }
 
 impl App {
-    pub async fn new(settings: Settings, db_driver: Box<dyn drivers::DbDriver>) -> Self {
+    pub async fn new(settings: Settings, db_driver: Box<dyn drivers::DbDriver>, config: Option<ProjectConfig>) -> Self {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
 
         let theme = Theme::catppuccin(Flavor::Mocha);
 
         return Self {
             settings,
+            config,
             running: false,
             event_stream: EventStream::new(),
             action_tx,
@@ -227,6 +232,9 @@ impl App {
             Cmd::Goto(sub_cmd) => Ok(Action::Cmd(AppCmd::Goto(sub_cmd))),
             Cmd::Sort(column, direction) => Ok(Action::Cmd(AppCmd::Sort(column, direction.into()))),
             Cmd::Limit(limit) => Ok(Action::Cmd(AppCmd::Limit(limit))),
+            Cmd::RefreshTable => Ok(Action::Db(DbAction::QueryTable(
+                self.table_model.table_name.clone(),
+            ))),
         };
     }
 

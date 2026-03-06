@@ -61,7 +61,7 @@ pub enum ResultsTableAction {
 }
 
 pub enum DbAction {
-    QueryTable(String),
+    QueryTable(String), // TODO: Remove needing to pass a string if every caller has the same context.
     QueryCount,
     QueryCountComplete(Result<usize>),
     QueryTableComplete(String, QueryResult),
@@ -86,6 +86,8 @@ pub enum CmdLineAction {
     PopChar,
     MoveLeft,
     MoveRight,
+    TogglePrevCommand,
+    ToggleNextCommand,
     Execute,
     Exit,
 }
@@ -119,7 +121,11 @@ impl fmt::Debug for DbAction {
                 .field(page)
                 .finish(),
             DbAction::PrevPage => f.write_str("PrevPage"),
-            DbAction::PrevPageComplete(_, offset) => f.debug_tuple("PrevPageComplete").field(&"<QueryResult>").field(offset).finish(),
+            DbAction::PrevPageComplete(_, offset) => f
+                .debug_tuple("PrevPageComplete")
+                .field(&"<QueryResult>")
+                .field(offset)
+                .finish(),
             DbAction::GotoPageComplete(_, page, total) => f
                 .debug_tuple("GotoPageComplete")
                 .field(&"<QueryResult>")
