@@ -13,6 +13,7 @@ use crate::app::View;
 use crate::commander::GotoCmd;
 use crate::config::project::append_history;
 use crate::drivers::OrderBy;
+use crate::models::explorer::ExplorerItem;
 use crate::models::explorer::ExplorerItemKind;
 use crate::models::statusline::MsgKind;
 use crate::models::statusline::MsgLifetime;
@@ -68,11 +69,7 @@ impl App {
                 }
             },
             AppAction::SelectTable(name) => {
-                self.table_model.reset_ui(Some(0));
-                self.table_model.total_count = None;
-                self.table_model.query_state = Default::default();
-
-                let _ = self.action_tx.send(Action::Db(DbAction::QueryTable(name)));
+                self.select_table(name);
             }
             AppAction::Resize(w, h) => {
                 self.area.width = w;
@@ -335,36 +332,36 @@ impl App {
 
     fn update_db(&mut self, action: DbAction) {
         match action {
-            DbAction::QueryTable(table_name) => {
-                self.update(Action::App(AppAction::StartLoading));
+            DbAction::QueryTable => {
+                if let Some(table_name) = self.table_model.table_name.clone() {
+                    self.update(Action::App(AppAction::StartLoading));
 
-                // Spawn background task to query
-                let driver = self.db_driver.clone();
-                let tx = self.action_tx.clone();
-                let order_by = self.table_model.query_state.order_by.clone();
-                let offset = self.table_model.query_state.offset;
-                let limit = self.table_model.query_state.limit;
+                    // Spawn background task to query
+                    let driver = self.db_driver.clone();
+                    let tx = self.action_tx.clone();
+                    let order_by = self.table_model.query_state.order_by.clone();
+                    let offset = self.table_model.query_state.offset;
+                    let limit = self.table_model.query_state.limit;
 
-                tokio::spawn(async move {
-                    let res: Result<()> = async {
-                        let mut driver = driver.lock().await;
-                        let results = driver.query(&table_name, order_by, offset, limit).await?;
-                        let _ = tx.send(Action::Db(DbAction::QueryTableComplete(
-                            table_name, results,
-                        )));
+                    tokio::spawn(async move {
+                        let res: Result<()> = async {
+                            let mut driver = driver.lock().await;
+                            let results = driver.query(&table_name, order_by, offset, limit).await?;
+                            let _ = tx.send(Action::Db(DbAction::QueryTableComplete(results)));
 
-                        eyre::Ok(())
-                    }
-                    .await;
+                            eyre::Ok(())
+                        }
+                        .await;
 
-                    let _ = tx.send(Action::App(AppAction::StopLoading));
+                        let _ = tx.send(Action::App(AppAction::StopLoading));
 
-                    if let Err(err) = res {
-                        let _ = tx.send(Action::App(AppAction::ReportError(err)));
-                    }
-                });
+                        if let Err(err) = res {
+                            let _ = tx.send(Action::App(AppAction::ReportError(err)));
+                        }
+                    });
+                }
             }
-            DbAction::QueryCount => match self.selected_table.clone() {
+            DbAction::QueryCount => match self.table_model.table_name.clone() {
                 Some(table) => {
                     self.update(Action::App(AppAction::StartLoading));
 
@@ -406,14 +403,11 @@ impl App {
                 }
                 Err(err) => self.update(Action::App(AppAction::ReportError(err))),
             },
-            DbAction::QueryTableComplete(table_name, results) => {
-                self.selected_table = Some(table_name.clone());
-
+            DbAction::QueryTableComplete(results) => {
                 let rows_fetched = results.rows.len();
                 self.table_model.query_result = results;
 
                 self.table_model.current_page = 0;
-                self.table_model.table_name = table_name.clone();
                 self.table_model.results_row_count = self.table_model.query_result.rows.len();
                 self.table_model.ratatui_table_state.select(Some(0));
                 self.table_model.current_page = 0;
@@ -423,7 +417,7 @@ impl App {
                 self.report_message(&msg, MsgKind::Neutral, MsgLifetime::Short);
             }
             DbAction::NextPage => {
-                if let Some(selected_table) = self.selected_table.clone() {
+                if let Some(selected_table) = self.table_model.table_name.clone() {
                     self.update(Action::App(AppAction::StartLoading));
 
                     let driver = self.db_driver.clone();
@@ -466,7 +460,7 @@ impl App {
                 self.update(Action::App(AppAction::StopLoading));
             }
             DbAction::PrevPage => {
-                if let Some(selected_table) = self.selected_table.clone() {
+                if let Some(selected_table) = self.table_model.table_name.clone() {
                     if self.table_model.current_page == 0 {
                         return;
                     }
@@ -527,6 +521,7 @@ impl App {
             CmdLineAction::Execute => {
                 let cmd = std::mem::take(&mut self.statusline_model.cmd.text);
                 self.statusline_model.cmd.cursor = 0;
+                self.statusline_model.history_cursor = 0;
 
                 let action = self.evaluate_app_action_from_cmd(&cmd);
                 match action {
@@ -556,6 +551,27 @@ impl App {
                     .text
                     .insert(self.statusline_model.cmd.cursor, character);
                 self.statusline_model.cmd.cursor += 1;
+            }
+            CmdLineAction::PopWord => {
+                if self.statusline_model.cmd.cursor > 0 {
+                    let text = &self.statusline_model.cmd.text;
+                    let mut new_cursor = self.statusline_model.cmd.cursor;
+
+                    // skip trailing whitespace
+                    while new_cursor > 0 && text.chars().nth(new_cursor - 1).map_or(false, |c| c.is_whitespace()) {
+                        new_cursor -= 1;
+                    }
+                    // skip the word
+                    while new_cursor > 0 && text.chars().nth(new_cursor - 1).map_or(false, |c| !c.is_whitespace()) {
+                        new_cursor -= 1;
+                    }
+
+                    self.statusline_model
+                        .cmd
+                        .text
+                        .drain(new_cursor..self.statusline_model.cmd.cursor);
+                    self.statusline_model.cmd.cursor = new_cursor;
+                }
             }
             CmdLineAction::PopChar => {
                 if self.statusline_model.cmd.cursor > 0 {
@@ -631,7 +647,7 @@ impl App {
         match action {
             AppCmd::Count => self.update(Action::Db(DbAction::QueryCount)),
             AppCmd::Goto(sub_cmd) => match sub_cmd {
-                GotoCmd::Page(page) => match self.selected_table.clone() {
+                GotoCmd::Page(page) => match self.table_model.table_name.clone() {
                     Some(table) => {
                         let db_driver = self.db_driver.clone();
                         let tx = self.action_tx.clone();
@@ -679,8 +695,28 @@ impl App {
                         self.focus_pane(Pane::Left);
                     }
                 },
+                GotoCmd::Table(table_name) => {
+                    let matches: Vec<&ExplorerItem> = self
+                        .explorer_model
+                        .items
+                        .iter()
+                        .filter(|it| it.name == table_name)
+                        .collect();
+
+                    if !matches.is_empty() {
+                        let table = matches[0];
+                        self.select_table(table.name.clone());
+                    } else {
+                        self.report_message(
+                            &format!("Table \"{}\" is not found", table_name),
+                            MsgKind::Error,
+                            MsgLifetime::Short,
+                        );
+                        self.focus_pane(Pane::Left);
+                    }
+                }
             },
-            AppCmd::Sort(column, direction) => match self.selected_table.clone() {
+            AppCmd::Sort(column, direction) => match self.table_model.table_name.clone() {
                 Some(table) => {
                     self.update(Action::App(AppAction::StartLoading));
 
@@ -699,7 +735,7 @@ impl App {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
                             let results = driver.query(&table, order_by, 0, limit).await?;
-                            let _ = tx.send(Action::Db(DbAction::QueryTableComplete(table, results)));
+                            let _ = tx.send(Action::Db(DbAction::QueryTableComplete(results)));
 
                             eyre::Ok(())
                         }
@@ -721,7 +757,7 @@ impl App {
                     self.focus_pane(Pane::Left);
                 }
             },
-            AppCmd::Limit(limit) => match self.selected_table.clone() {
+            AppCmd::Limit(limit) => match self.table_model.table_name.clone() {
                 Some(table) => {
                     self.update(Action::App(AppAction::StartLoading));
 
@@ -737,7 +773,7 @@ impl App {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
                             let results = driver.query(&table, order_by, 0, limit).await?;
-                            let _ = tx.send(Action::Db(DbAction::QueryTableComplete(table, results)));
+                            let _ = tx.send(Action::Db(DbAction::QueryTableComplete(results)));
 
                             eyre::Ok(())
                         }

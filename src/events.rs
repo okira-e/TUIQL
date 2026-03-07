@@ -188,6 +188,11 @@ impl App {
                     return;
                 }
 
+                (KeyModifiers::ALT, KeyCode::Backspace) => {
+                    self.update(Action::CmdLine(CmdLineAction::PopWord));
+                    return;
+                }
+
                 (_, KeyCode::Backspace) => {
                     self.update(Action::CmdLine(CmdLineAction::PopChar));
                     return;

@@ -35,7 +35,7 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
     let mut container_block = Block::default()
         .title("Query Result".to_string())
         .title(
-            Line::from(model.table_name.clone())
+            Line::from(model.table_name.clone().unwrap_or(String::new()))
                 .style(theme.fg)
                 .alignment(Alignment::Right),
         )

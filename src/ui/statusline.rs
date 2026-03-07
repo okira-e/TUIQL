@@ -51,12 +51,12 @@ pub fn render_statusline(
             frame.render_widget(&line_widget, area);
         }
         StatusLineMode::Command => {
-            let text = format!("> {}", model.cmd.text);
+            let text = format!(": {}", model.cmd.text);
             let widget = Paragraph::new(text);
 
             frame.render_widget(&widget, area);
             if focused {
-                let left_padding = 2; // The "> "
+                let left_padding = 2; // The ": "
                 frame.set_cursor_position(Position {
                     x: area.x + model.cmd.cursor as u16 + left_padding,
                     y: area.y + 1,

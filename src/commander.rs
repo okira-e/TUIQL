@@ -16,6 +16,7 @@ pub enum Cmd {
 #[derive(Debug, PartialEq)]
 pub enum GotoCmd {
     Page(usize),
+    Table(String),
 }
 
 #[derive(Debug, PartialEq)]
@@ -55,7 +56,9 @@ fn parse_goto_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
                 }
                 None => bail!("Missing page number argument"),
             },
-            _ => bail!("Unknown goto sub-command: {}", sub_cmd),
+            _ => {
+                Ok(Cmd::Goto(GotoCmd::Table(sub_cmd.to_string())))
+            },
         },
         None => bail!("Missing goto sub-command"),
     };

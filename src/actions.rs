@@ -61,10 +61,10 @@ pub enum ResultsTableAction {
 }
 
 pub enum DbAction {
-    QueryTable(String), // TODO: Remove needing to pass a string if every caller has the same context.
+    QueryTable,
     QueryCount,
     QueryCountComplete(Result<usize>),
-    QueryTableComplete(String, QueryResult),
+    QueryTableComplete(QueryResult),
     NextPage,
     NextPageComplete(QueryResult, usize),
     PrevPage,
@@ -84,6 +84,7 @@ pub enum JsonViewAction {
 pub enum CmdLineAction {
     AddChar(char),
     PopChar,
+    PopWord,
     MoveLeft,
     MoveRight,
     TogglePrevCommand,
@@ -105,13 +106,12 @@ pub enum AppCmd {
 impl fmt::Debug for DbAction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DbAction::QueryTable(s) => f.debug_tuple("QueryTable").field(s).finish(),
+            DbAction::QueryTable => f.write_str("QueryTable"),
             DbAction::QueryCount => f.write_str("QueryCount"),
             DbAction::QueryCountComplete(r) => f.debug_tuple("QueryCountComplete").field(r).finish(),
 
-            DbAction::QueryTableComplete(name, _) => f
+            DbAction::QueryTableComplete(_) => f
                 .debug_tuple("QueryTableComplete")
-                .field(name)
                 .field(&"<QueryResult>")
                 .finish(),
             DbAction::NextPage => f.write_str("NextPage"),

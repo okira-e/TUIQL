@@ -81,7 +81,6 @@ pub struct App {
     /// instead.
     pub db_driver: Arc<Mutex<Box<dyn DbDriver>>>,
     pub theme: Theme,
-    pub selected_table: Option<String>,
     pub area: Rect,
     pub is_loading: bool,
     pub prev_pane: Pane,
@@ -102,10 +101,8 @@ impl App {
             action_rx,
             db_driver: Arc::new(Mutex::new(db_driver)),
             theme,
-            selected_table: None,
             focused_pane: Pane::Left,
             right_view: RightView::ResultsTable,
-            // active_temporary_widget: None,
             widgets_chunks: WidgetsChunks::default(),
             table_model: TableModel::default(),
             explorer_model: ExplorerModel::default(),
@@ -232,14 +229,21 @@ impl App {
             Cmd::Goto(sub_cmd) => Ok(Action::Cmd(AppCmd::Goto(sub_cmd))),
             Cmd::Sort(column, direction) => Ok(Action::Cmd(AppCmd::Sort(column, direction.into()))),
             Cmd::Limit(limit) => Ok(Action::Cmd(AppCmd::Limit(limit))),
-            Cmd::RefreshTable => Ok(Action::Db(DbAction::QueryTable(
-                self.table_model.table_name.clone(),
-            ))),
+            Cmd::RefreshTable => Ok(Action::Db(DbAction::QueryTable)),
         };
     }
 
     pub fn focus_pane(&mut self, pane: Pane) {
         self.prev_pane = self.focused_pane;
         self.focused_pane = pane;
+    }
+
+    pub fn select_table(&mut self, name: String) {
+        self.table_model.table_name = Some(name.clone());
+        self.table_model.reset_ui(Some(0));
+        self.table_model.total_count = None;
+        self.table_model.query_state = Default::default();
+
+        let _ = self.action_tx.send(Action::Db(DbAction::QueryTable));
     }
 }

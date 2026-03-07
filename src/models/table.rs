@@ -7,7 +7,7 @@ use serde_json::Value;
 
 #[derive(Debug)]
 pub struct TableModel {
-    pub table_name: String,
+    pub table_name: Option<String>,
     pub query_state: QueryState,
     pub query_result: QueryResult,
     pub results_row_count: usize,
