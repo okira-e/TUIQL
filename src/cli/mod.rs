@@ -11,6 +11,7 @@ use crate::config::project::load_project_config;
 use crate::config::settings::load_settings;
 use crate::drivers;
 use crate::drivers::DbDriver;
+
 use clap::Subcommand;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
@@ -65,7 +66,7 @@ async fn exec_command(command: Commands) -> Result<()> {
     };
 }
 
-async fn run_app(db_driver: Box<dyn DbDriver>, project_name: Option<&str>) -> Result<()> {
+async fn run_app(db_driver: DbDriver, project_name: Option<&str>) -> Result<()> {
     let settings = load_settings()?;
     let project_config = match project_name {
         None => None,

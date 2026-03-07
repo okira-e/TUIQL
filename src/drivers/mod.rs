@@ -6,33 +6,73 @@ pub mod postgres;
 use crate::commander::SortCmdDirection;
 use crate::drivers::kinds::DbKind;
 use crate::drivers::postgres::PostgresDriver;
-use async_trait::async_trait;
 use color_eyre::Result;
 use std::fmt;
 
-#[async_trait]
-pub trait DbDriver: Send + Sync {
-    async fn get_tables(&self) -> Result<Vec<String>>;
-    async fn get_views(&self) -> Result<Vec<String>>;
-    async fn get_mateialized_views(&self) -> Result<Vec<String>>;
-    async fn query(
+pub enum DbDriver {
+    Postgres(PostgresDriver),
+}
+
+impl DbDriver {
+    pub async fn get_tables(&self) -> Result<Vec<String>> {
+        match self {
+            DbDriver::Postgres(driver) => driver.get_tables().await,
+        }
+    }
+
+    pub async fn get_views(&self) -> Result<Vec<String>> {
+        match self {
+            DbDriver::Postgres(driver) => driver.get_views().await,
+        }
+    }
+
+    pub async fn get_mateialized_views(&self) -> Result<Vec<String>> {
+        match self {
+            DbDriver::Postgres(driver) => driver.get_mateialized_views().await,
+        }
+    }
+
+    pub async fn query(
         &mut self,
         table_name: &str,
         order_by: Option<OrderBy>,
         offset: usize,
         limit: usize,
-    ) -> Result<QueryResult>;
-    async fn query_count(&mut self, table_name: &str) -> Result<usize>;
-    // async fn get_default_order_by(&mut self, table_name: &str) -> Result<String>;
-    async fn get_default_order_by(&self, table_name: &str) -> Result<Option<OrderBy>>;
-    async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>>;
-    async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>>;
+    ) -> Result<QueryResult> {
+        match self {
+            DbDriver::Postgres(d) => d.query(table_name, order_by, offset, limit).await,
+        }
+    }
+
+    pub async fn query_count(&mut self, table_name: &str) -> Result<usize> {
+        match self {
+            DbDriver::Postgres(d) => d.query_count(table_name).await,
+        }
+    }
+
+    pub async fn get_default_order_by(&self, table_name: &str) -> Result<Option<OrderBy>> {
+        match self {
+            DbDriver::Postgres(d) => d.get_default_order_by(table_name).await,
+        }
+    }
+
+    pub async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>> {
+        match self {
+            DbDriver::Postgres(d) => d.get_pk_columns(table_name).await,
+        }
+    }
+
+    pub async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>> {
+        match self {
+            DbDriver::Postgres(d) => d.get_columns(table_name).await,
+        }
+    }
 }
 
-pub async fn new_connection(kind: DbKind, url: &str) -> Result<Box<dyn DbDriver>> {
+pub async fn new_connection(kind: DbKind, url: &str) -> Result<DbDriver> {
     return match kind {
         DbKind::MySQL | DbKind::Mariadb => todo!(),
-        DbKind::Postgres => Ok(Box::new(PostgresDriver::new_pool(url).await?)),
+        DbKind::Postgres => Ok(DbDriver::Postgres(PostgresDriver::new_pool(url).await?)),
         DbKind::SQLite => todo!(),
     };
 }
@@ -66,8 +106,8 @@ pub struct ColumnMetadata {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct OrderBy {
-    columns: Vec<String>,
-    order: OrderByDirection,
+    pub columns: Vec<String>,
+    pub order: OrderByDirection,
 }
 
 impl OrderBy {

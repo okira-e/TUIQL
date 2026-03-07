@@ -8,6 +8,7 @@ use crate::config::project::ProjectConfig;
 use crate::config::settings::Settings;
 use crate::drivers;
 use crate::drivers::DbDriver;
+
 use crate::models::explorer_model::ExplorerItem;
 use crate::models::explorer_model::ExplorerItemKind;
 use crate::models::explorer_model::ExplorerModel;
@@ -79,7 +80,7 @@ pub struct App {
     ///
     /// If we wanted to allow for concurrent requests to the database we could use a semaphore
     /// instead.
-    pub db_driver: Arc<Mutex<Box<dyn DbDriver>>>,
+    pub db_driver: Arc<Mutex<DbDriver>>,
     pub theme: Theme,
     pub area: Rect,
     pub is_loading: bool,
@@ -87,7 +88,7 @@ pub struct App {
 }
 
 impl App {
-    pub async fn new(settings: Settings, db_driver: Box<dyn drivers::DbDriver>, config: Option<ProjectConfig>) -> Self {
+    pub async fn new(settings: Settings, db_driver: drivers::DbDriver, config: Option<ProjectConfig>) -> Self {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
 
         let theme = Theme::catppuccin(Flavor::Mocha);

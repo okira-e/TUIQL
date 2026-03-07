@@ -2,9 +2,7 @@ use crate::drivers::ColumnMetadata;
 use crate::drivers::OrderBy;
 use crate::drivers::OrderByDirection;
 use crate::drivers::QueryResult;
-use crate::drivers::{self};
 use crate::utils;
-use async_trait::async_trait;
 use color_eyre::Result;
 use dashmap::DashMap;
 use futures::TryStreamExt;
@@ -46,11 +44,8 @@ impl PostgresDriver {
 
         return Ok(());
     }
-}
 
-#[async_trait]
-impl drivers::DbDriver for PostgresDriver {
-    async fn get_tables(&self) -> Result<Vec<String>> {
+    pub async fn get_tables(&self) -> Result<Vec<String>> {
         let rows: Vec<PgRow> = sqlx::query(
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name NOT IN (SELECT inhrelid::regclass::text FROM pg_inherits)",
         )
@@ -65,7 +60,7 @@ impl drivers::DbDriver for PostgresDriver {
         return Ok(tables);
     }
 
-    async fn get_views(&self) -> Result<Vec<String>> {
+    pub async fn get_views(&self) -> Result<Vec<String>> {
         let rows: Vec<PgRow> =
             sqlx::query("SELECT table_name FROM information_schema.views WHERE table_schema = 'public'")
                 .fetch_all(&self.pool)
@@ -79,7 +74,7 @@ impl drivers::DbDriver for PostgresDriver {
         return Ok(views);
     }
 
-    async fn get_mateialized_views(&self) -> Result<Vec<String>> {
+    pub async fn get_mateialized_views(&self) -> Result<Vec<String>> {
         let rows: Vec<PgRow> = sqlx::query(
             "SELECT matviewname AS table_name
             FROM pg_matviews
@@ -97,7 +92,7 @@ impl drivers::DbDriver for PostgresDriver {
         return Ok(views);
     }
 
-    async fn query(
+    pub async fn query(
         &mut self,
         table_name: &str,
         order_by: Option<OrderBy>,
@@ -120,7 +115,7 @@ impl drivers::DbDriver for PostgresDriver {
 
         let sql = format!(
             r#"
-            SELECT 
+            SELECT
                 to_jsonb(t) AS row
             FROM (
                 SELECT *
@@ -147,7 +142,7 @@ impl drivers::DbDriver for PostgresDriver {
         return Ok(QueryResult { columns: columns, rows: out_rows });
     }
 
-    async fn query_count(&mut self, table_name: &str) -> Result<usize> {
+    pub async fn query_count(&mut self, table_name: &str) -> Result<usize> {
         let ident = utils::quote_ident(table_name);
 
         let sql = format!(
@@ -162,7 +157,7 @@ impl drivers::DbDriver for PostgresDriver {
         return Ok(count_usize);
     }
 
-    async fn get_default_order_by(&self, table_name: &str) -> Result<Option<OrderBy>> {
+    pub async fn get_default_order_by(&self, table_name: &str) -> Result<Option<OrderBy>> {
         let pk_cols = self.get_pk_columns(&table_name).await?;
         if pk_cols.is_empty() {
             return Ok(None);
@@ -174,7 +169,7 @@ impl drivers::DbDriver for PostgresDriver {
         }
     }
 
-    async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>> {
+    pub async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>> {
         // Check cache
         if let Some(cols) = self.pk_columns_cache.get(table_name) {
             return Ok(cols.clone());
@@ -225,7 +220,7 @@ impl drivers::DbDriver for PostgresDriver {
         return Ok(pk_cols);
     }
 
-    async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>> {
+    pub async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>> {
         // Check cache
         if let Some(cols) = self.table_columns_cache.get(table_name) {
             return Ok(cols.clone());
