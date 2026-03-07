@@ -9,7 +9,7 @@ mod logging;
 mod models;
 mod render;
 mod theme;
-mod ui;
+mod views;
 mod update;
 mod utils;
 

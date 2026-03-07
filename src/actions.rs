@@ -3,8 +3,8 @@ use std::fmt;
 use crate::commander::GotoCmd;
 use crate::drivers::OrderByDirection;
 use crate::drivers::QueryResult;
-use crate::models::statusline::MsgKind;
-use crate::models::statusline::MsgLifetime;
+use crate::models::statusline_model::MsgKind;
+use crate::models::statusline_model::MsgLifetime;
 use color_eyre::Result;
 use color_eyre::eyre;
 

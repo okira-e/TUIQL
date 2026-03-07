@@ -1,4 +1,4 @@
-use crate::models::json_view::JsonViewModel;
+use crate::models::json_view_model::JsonViewModel;
 use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Alignment;

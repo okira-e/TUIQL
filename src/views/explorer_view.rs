@@ -1,6 +1,6 @@
-use crate::models::explorer::ExplorerItem;
-use crate::models::explorer::ExplorerItemKind;
-use crate::models::explorer::ExplorerModel;
+use crate::models::explorer_model::ExplorerItem;
+use crate::models::explorer_model::ExplorerItemKind;
+use crate::models::explorer_model::ExplorerModel;
 use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Alignment;

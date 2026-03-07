@@ -1,6 +1,6 @@
-use crate::models::statusline::MsgKind;
-use crate::models::statusline::StatusLineMode;
-use crate::models::statusline::StatusLineModel;
+use crate::models::statusline_model::MsgKind;
+use crate::models::statusline_model::StatusLineMode;
+use crate::models::statusline_model::StatusLineModel;
 use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Position;

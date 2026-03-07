@@ -1,4 +1,4 @@
-use crate::models::table::TableModel;
+use crate::models::table_model::TableModel;
 use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Alignment;
