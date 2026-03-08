@@ -2,6 +2,8 @@ use color_eyre::eyre::Result;
 use color_eyre::eyre::bail;
 use std::str::SplitWhitespace;
 
+const MAX_LIMIT_ALLOWED: usize = 10_000;
+
 #[derive(Debug, PartialEq)]
 pub enum Cmd {
     Quit,
@@ -56,9 +58,7 @@ fn parse_goto_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
                 }
                 None => bail!("Missing page number argument"),
             },
-            _ => {
-                Ok(Cmd::Goto(GotoCmd::Table(sub_cmd.to_string())))
-            },
+            _ => Ok(Cmd::Goto(GotoCmd::Table(sub_cmd.to_string()))),
         },
         None => bail!("Missing goto sub-command"),
     };
@@ -88,17 +88,24 @@ fn parse_sort_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
 fn parse_limit_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
     return match iter.next() {
         Some(arg) => {
-            if let Ok(limit) = arg.parse::<usize>() {
-                if limit == 0 {
+            let limit = if let Ok(l) = arg.parse::<usize>() {
+                if l == 0 {
                     bail!("Limit must be greater than 0");
                 }
-                Ok(Cmd::Limit(limit))
+
+                l
             } else {
                 match parse_metric(arg) {
-                    Some(l) => Ok(Cmd::Limit(l)),
+                    Some(l) => l,
                     None => bail!("Invalid limit: {}", arg),
                 }
+            };
+
+            if limit > MAX_LIMIT_ALLOWED {
+                bail!("Limit is too big!");
             }
+
+            Ok(Cmd::Limit(limit))
         }
         None => bail!("Limit command requires a number as an argument"),
     };
@@ -115,7 +122,6 @@ fn parse_metric(input: &str) -> Option<usize> {
     let multiplier = match suffix.to_ascii_lowercase().as_str() {
         "" => 1.0,
         "k" => 1e3,
-        "m" => 1e6,
         _ => return None,
     };
 

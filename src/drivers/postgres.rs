@@ -18,8 +18,9 @@ pub struct PostgresDriver {
 impl PostgresDriver {
     pub async fn new_pool(dsn: &str) -> Result<Self> {
         let pool = sqlx::postgres::PgPoolOptions::new()
-            .max_connections(10)
+            .max_connections(2)
             .acquire_timeout(std::time::Duration::from_secs(3))
+            .idle_timeout(std::time::Duration::from_secs(600))
             .connect(dsn)
             .await?;
 
@@ -108,7 +109,7 @@ impl PostgresDriver {
             None => String::new(),
             Some(ob) => format!(
                 " ORDER BY {} {}",
-                ob.columns.join(", "),
+                ob.columns.iter().map(|c| utils::quote_ident(c)).collect::<Vec<_>>().join(", "),
                 ob.order.to_string()
             ),
         };

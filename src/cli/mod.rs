@@ -118,8 +118,8 @@ async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
         name: args.name,
         kind: args.r#type,
         url: format!(
-            "postgres://{}:{}@{}:{}/{}",
-            args.user, args.pass, args.host, args.port, args.database
+            "{}://{}:{}@{}:{}/{}",
+            args.r#type, args.user, args.pass, args.host, args.port, args.database
         ),
     };
 

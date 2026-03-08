@@ -1,34 +1,39 @@
 pub mod kinds;
-// pub mod mysql;
+pub mod mysql;
 // pub mod sqlite;
 pub mod postgres;
 
 use crate::commander::SortCmdDirection;
 use crate::drivers::kinds::DbKind;
+use crate::drivers::mysql::MySqlDriver;
 use crate::drivers::postgres::PostgresDriver;
 use color_eyre::Result;
 use std::fmt;
 
 pub enum DbDriver {
     Postgres(PostgresDriver),
+    MySql(MySqlDriver),
 }
 
 impl DbDriver {
     pub async fn get_tables(&self) -> Result<Vec<String>> {
         match self {
-            DbDriver::Postgres(driver) => driver.get_tables().await,
+            DbDriver::Postgres(d) => d.get_tables().await,
+            DbDriver::MySql(d) => d.get_tables().await,
         }
     }
 
     pub async fn get_views(&self) -> Result<Vec<String>> {
         match self {
-            DbDriver::Postgres(driver) => driver.get_views().await,
+            DbDriver::Postgres(d) => d.get_views().await,
+            DbDriver::MySql(d) => d.get_views().await,
         }
     }
 
     pub async fn get_mateialized_views(&self) -> Result<Vec<String>> {
         match self {
-            DbDriver::Postgres(driver) => driver.get_mateialized_views().await,
+            DbDriver::Postgres(d) => d.get_mateialized_views().await,
+            DbDriver::MySql(d) => d.get_mateialized_views().await,
         }
     }
 
@@ -41,37 +46,42 @@ impl DbDriver {
     ) -> Result<QueryResult> {
         match self {
             DbDriver::Postgres(d) => d.query(table_name, order_by, offset, limit).await,
+            DbDriver::MySql(d) => d.query(table_name, order_by, offset, limit).await,
         }
     }
 
     pub async fn query_count(&mut self, table_name: &str) -> Result<usize> {
         match self {
             DbDriver::Postgres(d) => d.query_count(table_name).await,
+            DbDriver::MySql(d) => d.query_count(table_name).await,
         }
     }
 
     pub async fn get_default_order_by(&self, table_name: &str) -> Result<Option<OrderBy>> {
         match self {
             DbDriver::Postgres(d) => d.get_default_order_by(table_name).await,
+            DbDriver::MySql(d) => d.get_default_order_by(table_name).await,
         }
     }
 
     pub async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>> {
         match self {
             DbDriver::Postgres(d) => d.get_pk_columns(table_name).await,
+            DbDriver::MySql(d) => d.get_pk_columns(table_name).await,
         }
     }
 
     pub async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>> {
         match self {
             DbDriver::Postgres(d) => d.get_columns(table_name).await,
+            DbDriver::MySql(d) => d.get_columns(table_name).await,
         }
     }
 }
 
 pub async fn new_connection(kind: DbKind, url: &str) -> Result<DbDriver> {
     return match kind {
-        DbKind::MySQL | DbKind::Mariadb => todo!(),
+        DbKind::MySQL | DbKind::Mariadb => Ok(DbDriver::MySql(MySqlDriver::new_pool(url).await?)),
         DbKind::Postgres => Ok(DbDriver::Postgres(PostgresDriver::new_pool(url).await?)),
         DbKind::SQLite => todo!(),
     };
@@ -86,7 +96,7 @@ pub async fn ping_connection(
     db_name: &str,
 ) -> Result<()> {
     match kind {
-        DbKind::MySQL | DbKind::Mariadb => todo!(),
+        DbKind::MySQL | DbKind::Mariadb => MySqlDriver::ping(host, port, user, password, db_name).await,
         DbKind::Postgres => PostgresDriver::ping(host, port, user, password, db_name).await,
         DbKind::SQLite => todo!(),
     }
