@@ -101,7 +101,13 @@ impl MySqlDriver {
 
         let json_args: Vec<String> = columns
             .iter()
-            .map(|c| format!("'{}', t.{}", c.name.replace('\'', "''"), quote_ident(&c.name)))
+            .map(|c| {
+                format!(
+                    "'{}', t.{}",
+                    c.name.replace('\'', "''"),
+                    quote_ident(&c.name)
+                )
+            })
             .collect();
         let json_object_expr = format!("JSON_OBJECT({})", json_args.join(", "));
 

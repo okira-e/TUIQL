@@ -109,7 +109,11 @@ impl PostgresDriver {
             None => String::new(),
             Some(ob) => format!(
                 " ORDER BY {} {}",
-                ob.columns.iter().map(|c| utils::quote_ident(c)).collect::<Vec<_>>().join(", "),
+                ob.columns
+                    .iter()
+                    .map(|c| utils::quote_ident(c))
+                    .collect::<Vec<_>>()
+                    .join(", "),
                 ob.order.to_string()
             ),
         };

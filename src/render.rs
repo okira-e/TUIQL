@@ -1,7 +1,3 @@
-use ratatui::Frame;
-use ratatui::style::Style;
-use ratatui::widgets::Block;
-
 use crate::app::App;
 use crate::app::RightView;
 use crate::app::View;
@@ -9,6 +5,9 @@ use crate::views::explorer_view::render_explorer;
 use crate::views::json_view::render_json_view;
 use crate::views::statusline_view::render_statusline;
 use crate::views::table_view::render_table;
+use ratatui::Frame;
+use ratatui::style::Style;
+use ratatui::widgets::Block;
 
 impl App {
     pub fn render(&mut self, frame: &mut Frame) {

@@ -8,7 +8,6 @@ use crate::config::project::ProjectConfig;
 use crate::config::settings::Settings;
 use crate::drivers;
 use crate::drivers::DbDriver;
-
 use crate::models::explorer_model::ExplorerItem;
 use crate::models::explorer_model::ExplorerItemKind;
 use crate::models::explorer_model::ExplorerModel;

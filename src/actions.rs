@@ -1,5 +1,3 @@
-use std::fmt;
-
 use crate::commander::GotoCmd;
 use crate::drivers::OrderByDirection;
 use crate::drivers::QueryResult;
@@ -7,6 +5,7 @@ use crate::models::statusline_model::MsgKind;
 use crate::models::statusline_model::MsgLifetime;
 use color_eyre::Result;
 use color_eyre::eyre;
+use std::fmt;
 
 #[derive(Debug)]
 pub enum Action {
@@ -110,10 +109,7 @@ impl fmt::Debug for DbAction {
             DbAction::QueryCount => f.write_str("QueryCount"),
             DbAction::QueryCountComplete(r) => f.debug_tuple("QueryCountComplete").field(r).finish(),
 
-            DbAction::QueryTableComplete(_) => f
-                .debug_tuple("QueryTableComplete")
-                .field(&"<QueryResult>")
-                .finish(),
+            DbAction::QueryTableComplete(_) => f.debug_tuple("QueryTableComplete").field(&"<QueryResult>").finish(),
             DbAction::NextPage => f.write_str("NextPage"),
             DbAction::NextPageComplete(_, page) => f
                 .debug_tuple("NextPageComplete")

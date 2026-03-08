@@ -9,9 +9,9 @@ mod logging;
 mod models;
 mod render;
 mod theme;
-mod views;
 mod update;
 mod utils;
+mod views;
 
 use clap::Parser;
 use color_eyre::Result;

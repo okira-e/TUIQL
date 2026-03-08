@@ -1,4 +1,5 @@
 pub mod args;
+
 use crate::app::App;
 use crate::cli::args::ConnectCmdArgs;
 use crate::cli::args::OpenCmdArgs;
@@ -11,7 +12,6 @@ use crate::config::project::load_project_config;
 use crate::config::settings::load_settings;
 use crate::drivers;
 use crate::drivers::DbDriver;
-
 use clap::Subcommand;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
