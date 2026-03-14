@@ -577,6 +577,10 @@ impl App {
                     self.statusline_model.cmd.cursor = new_cursor;
                 }
             }
+            CmdLineAction::PopLine => {
+                self.statusline_model.cmd.text.drain(..self.statusline_model.cmd.cursor);
+                self.statusline_model.cmd.cursor = 0;
+            }
             CmdLineAction::PopChar => {
                 if self.statusline_model.cmd.cursor > 0 {
                     self.statusline_model.cmd.cursor -= 1;
@@ -589,6 +593,43 @@ impl App {
             CmdLineAction::MoveRight => {
                 let new_pos = self.statusline_model.cmd.cursor + 1;
                 self.statusline_model.cmd.cursor = new_pos.min(self.statusline_model.cmd.text.len());
+            }
+            CmdLineAction::MoveLeftWord => {
+                let text = &self.statusline_model.cmd.text;
+                let mut cursor = self.statusline_model.cmd.cursor;
+
+                // skip trailing whitespace
+                while cursor > 0 && text.chars().nth(cursor - 1).map_or(false, |c| c.is_whitespace()) {
+                    cursor -= 1;
+                }
+                // skip the word
+                while cursor > 0 && text.chars().nth(cursor - 1).map_or(false, |c| !c.is_whitespace()) {
+                    cursor -= 1;
+                }
+
+                self.statusline_model.cmd.cursor = cursor;
+            }
+            CmdLineAction::MoveRightWord => {
+                let text = &self.statusline_model.cmd.text;
+                let len = text.len();
+                let mut cursor = self.statusline_model.cmd.cursor;
+
+                // skip current word
+                while cursor < len && text.chars().nth(cursor).map_or(false, |c| !c.is_whitespace()) {
+                    cursor += 1;
+                }
+                // skip whitespace
+                while cursor < len && text.chars().nth(cursor).map_or(false, |c| c.is_whitespace()) {
+                    cursor += 1;
+                }
+
+                self.statusline_model.cmd.cursor = cursor;
+            },
+            CmdLineAction::SetText(text) => {
+                self.statusline_model.mode = StatusLineMode::Command;
+                self.statusline_model.cmd.text = text;
+                self.statusline_model.cmd.cursor = self.statusline_model.cmd.text.len();
+                self.focus_pane(Pane::StatusLine);
             }
             CmdLineAction::TogglePrevCommand => {
                 if let Some(config) = &self.config {

@@ -118,6 +118,20 @@ impl App {
                     return;
                 }
 
+                (_, KeyCode::Char('w')) => {
+                    self.update(Action::CmdLine(CmdLineAction::SetText(String::from(
+                        "where ",
+                    ))));
+                    return;
+                }
+
+                (_, KeyCode::Char('o')) => {
+                    self.update(Action::CmdLine(CmdLineAction::SetText(String::from(
+                        "order-by ",
+                    ))));
+                    return;
+                }
+
                 (_, KeyCode::Enter) => {
                     self.update(Action::App(AppAction::ViewSelectedRowAsJson));
                     return;
@@ -188,8 +202,25 @@ impl App {
                     return;
                 }
 
+                (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+                    self.update(Action::CmdLine(CmdLineAction::PopLine));
+                    return;
+                }
+
                 (KeyModifiers::ALT, KeyCode::Backspace) => {
                     self.update(Action::CmdLine(CmdLineAction::PopWord));
+                    return;
+                }
+
+                (KeyModifiers::ALT | KeyModifiers::CONTROL, KeyCode::Left)
+                | (KeyModifiers::ALT, KeyCode::Char('b')) => {
+                    self.update(Action::CmdLine(CmdLineAction::MoveLeftWord));
+                    return;
+                }
+
+                (KeyModifiers::ALT | KeyModifiers::CONTROL, KeyCode::Right)
+                | (KeyModifiers::ALT, KeyCode::Char('f')) => {
+                    self.update(Action::CmdLine(CmdLineAction::MoveRightWord));
                     return;
                 }
 
