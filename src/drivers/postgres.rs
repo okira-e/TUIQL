@@ -1,6 +1,4 @@
 use crate::drivers::ColumnMetadata;
-use crate::drivers::OrderBy;
-use crate::drivers::OrderByDirection;
 use crate::drivers::QueryResult;
 use crate::utils;
 use color_eyre::Result;
@@ -96,7 +94,8 @@ impl PostgresDriver {
     pub async fn query(
         &mut self,
         table_name: &str,
-        order_by: Option<OrderBy>,
+        order_by: Option<String>,
+        where_clause: Option<String>,
         offset: usize,
         limit: usize,
     ) -> Result<QueryResult> {
@@ -105,17 +104,14 @@ impl PostgresDriver {
         let columns = self.get_columns(table_name).await?;
         let ident = utils::quote_ident(table_name);
 
+        let where_sql = match where_clause {
+            None => String::new(),
+            Some(clause) => format!(" WHERE {}", clause),
+        };
+
         let order_sql = match order_by {
             None => String::new(),
-            Some(ob) => format!(
-                " ORDER BY {} {}",
-                ob.columns
-                    .iter()
-                    .map(|c| utils::quote_ident(c))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                ob.order.to_string()
-            ),
+            Some(clause) => format!(" ORDER BY {}", clause),
         };
 
         let sql = format!(
@@ -125,12 +121,14 @@ impl PostgresDriver {
             FROM (
                 SELECT *
                 FROM {table}
+                {where_sql}
                 {order_sql}
                 LIMIT $1
                 OFFSET $2
             ) AS t;
         "#,
             table = ident,
+            where_sql = where_sql,
             order_sql = order_sql,
         );
 
@@ -147,13 +145,15 @@ impl PostgresDriver {
         return Ok(QueryResult { columns: columns, rows: out_rows });
     }
 
-    pub async fn query_count(&mut self, table_name: &str) -> Result<usize> {
+    pub async fn query_count(&mut self, table_name: &str, where_clause: Option<String>) -> Result<usize> {
         let ident = utils::quote_ident(table_name);
 
-        let sql = format!(
-            "SELECT COUNT(*) AS count FROM {} {}",
-            ident, "" /* self.query_state.where_clause */
-        );
+        let where_sql = match where_clause {
+            None => String::new(),
+            Some(clause) => format!(" WHERE {}", clause),
+        };
+
+        let sql = format!("SELECT COUNT(*) AS count FROM {}{}", ident, where_sql);
 
         let count: i64 = sqlx::query(&sql).fetch_one(&self.pool).await?.get("count");
 
@@ -162,15 +162,17 @@ impl PostgresDriver {
         return Ok(count_usize);
     }
 
-    pub async fn get_default_order_by(&self, table_name: &str) -> Result<Option<OrderBy>> {
+    pub async fn get_default_order_by(&self, table_name: &str) -> Result<Option<String>> {
         let pk_cols = self.get_pk_columns(&table_name).await?;
         if pk_cols.is_empty() {
             return Ok(None);
         } else {
-            return Ok(Some(OrderBy {
-                columns: pk_cols,
-                order: OrderByDirection::Asc,
-            }));
+            let clause = pk_cols
+                .iter()
+                .map(|c| utils::quote_ident(c))
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Ok(Some(format!("{} ASC", clause)));
         }
     }
 

@@ -3,12 +3,10 @@ pub mod mysql;
 // pub mod sqlite;
 pub mod postgres;
 
-use crate::commander::SortCmdDirection;
 use crate::drivers::kinds::DbKind;
 use crate::drivers::mysql::MySqlDriver;
 use crate::drivers::postgres::PostgresDriver;
 use color_eyre::Result;
-use std::fmt;
 
 pub enum DbDriver {
     Postgres(PostgresDriver),
@@ -40,24 +38,25 @@ impl DbDriver {
     pub async fn query(
         &mut self,
         table_name: &str,
-        order_by: Option<OrderBy>,
+        order_by: Option<String>,
+        where_clause: Option<String>,
         offset: usize,
         limit: usize,
     ) -> Result<QueryResult> {
         match self {
-            DbDriver::Postgres(d) => d.query(table_name, order_by, offset, limit).await,
-            DbDriver::MySql(d) => d.query(table_name, order_by, offset, limit).await,
+            DbDriver::Postgres(d) => d.query(table_name, order_by, where_clause, offset, limit).await,
+            DbDriver::MySql(d) => d.query(table_name, order_by, where_clause, offset, limit).await,
         }
     }
 
-    pub async fn query_count(&mut self, table_name: &str) -> Result<usize> {
+    pub async fn query_count(&mut self, table_name: &str, where_clause: Option<String>) -> Result<usize> {
         match self {
-            DbDriver::Postgres(d) => d.query_count(table_name).await,
-            DbDriver::MySql(d) => d.query_count(table_name).await,
+            DbDriver::Postgres(d) => d.query_count(table_name, where_clause).await,
+            DbDriver::MySql(d) => d.query_count(table_name, where_clause).await,
         }
     }
 
-    pub async fn get_default_order_by(&self, table_name: &str) -> Result<Option<OrderBy>> {
+    pub async fn get_default_order_by(&self, table_name: &str) -> Result<Option<String>> {
         match self {
             DbDriver::Postgres(d) => d.get_default_order_by(table_name).await,
             DbDriver::MySql(d) => d.get_default_order_by(table_name).await,
@@ -112,46 +111,4 @@ pub struct QueryResult {
 pub struct ColumnMetadata {
     pub name: String,
     pub data_type: String,
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct OrderBy {
-    pub columns: Vec<String>,
-    pub order: OrderByDirection,
-}
-
-impl OrderBy {
-    pub fn new(columns: Vec<String>, order: OrderByDirection) -> Self {
-        Self { columns, order }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum OrderByDirection {
-    Asc,
-    Desc,
-}
-
-impl From<SortCmdDirection> for OrderByDirection {
-    fn from(sort_cmd_direction: SortCmdDirection) -> Self {
-        match sort_cmd_direction {
-            SortCmdDirection::Asc => Self::Asc,
-            SortCmdDirection::Desc => Self::Desc,
-        }
-    }
-}
-
-impl fmt::Display for OrderByDirection {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            OrderByDirection::Asc => write!(f, "ASC"),
-            OrderByDirection::Desc => write!(f, "DESC"),
-        }
-    }
-}
-
-impl Default for OrderByDirection {
-    fn default() -> Self {
-        Self::Asc
-    }
 }

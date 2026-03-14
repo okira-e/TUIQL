@@ -227,7 +227,8 @@ impl App {
             Cmd::Quit => Ok(Action::App(AppAction::Quit)),
             Cmd::Count => Ok(Action::Cmd(AppCmd::Count)),
             Cmd::Goto(sub_cmd) => Ok(Action::Cmd(AppCmd::Goto(sub_cmd))),
-            Cmd::Sort(column, direction) => Ok(Action::Cmd(AppCmd::Sort(column, direction.into()))),
+            Cmd::OrderBy(clause) => Ok(Action::Cmd(AppCmd::OrderBy(clause))),
+            Cmd::Where(clause) => Ok(Action::Cmd(AppCmd::Where(clause))),
             Cmd::Limit(limit) => Ok(Action::Cmd(AppCmd::Limit(limit))),
             Cmd::RefreshTable => Ok(Action::Db(DbAction::QueryTable)),
         };
@@ -241,7 +242,6 @@ impl App {
     pub fn select_table(&mut self, name: String) {
         self.table_model.table_name = Some(name.clone());
         self.table_model.reset_ui(Some(0));
-        self.table_model.total_count = None;
         self.table_model.query_state = Default::default();
 
         let _ = self.action_tx.send(Action::Db(DbAction::QueryTable));

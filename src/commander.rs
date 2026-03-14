@@ -10,7 +10,8 @@ pub enum Cmd {
     /// Returns the total count of the currently selected table
     Count,
     Goto(GotoCmd),
-    Sort(Option<String>, SortCmdDirection),
+    OrderBy(Option<String>),
+    Where(Option<String>),
     Limit(usize),
     RefreshTable,
 }
@@ -21,24 +22,19 @@ pub enum GotoCmd {
     Table(String),
 }
 
-#[derive(Debug, PartialEq)]
-pub enum SortCmdDirection {
-    Asc,
-    Desc,
-}
-
 pub fn parse_cmd(input: &str) -> Result<Cmd> {
     let mut iter = input.split_whitespace();
 
     let cmd = iter.next();
     return match cmd {
         Some(cmd) => match cmd {
-            "quit" | "q" => Ok(Cmd::Quit),
-            "count" | "c" => Ok(Cmd::Count),
-            "goto" | "g" => parse_goto_cmd(&mut iter),
-            "sort" | "s" => parse_sort_cmd(&mut iter),
-            "limit" | "l" => parse_limit_cmd(&mut iter),
-            "refresh" | "r" => Ok(Cmd::RefreshTable),
+            "q" | "quit" => Ok(Cmd::Quit),
+            "c" | "count" => Ok(Cmd::Count),
+            "g" | "goto" => parse_goto_cmd(&mut iter),
+            "ob" | "order-by" => parse_order_by_cmd(input),
+            "w" | "where" => parse_where_cmd(input),
+            "l" | "limit" => parse_limit_cmd(&mut iter),
+            "r" | "refresh" => Ok(Cmd::RefreshTable),
             _ => bail!("Unknown command: {}", cmd),
         },
         None => bail!("Empty command"),
@@ -64,25 +60,34 @@ fn parse_goto_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
     };
 }
 
-fn parse_sort_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
-    let default_sort_direction = SortCmdDirection::Asc;
+fn parse_order_by_cmd(input: &str) -> Result<Cmd> {
+    let clause = input
+        .trim()
+        .strip_prefix("order-by")
+        .or_else(|| input.trim().strip_prefix("ob"))
+        .unwrap_or("")
+        .trim();
 
-    let column = iter.next();
-    return match column {
-        Some(column) => match iter.next() {
-            Some(direction_str) => {
-                let direction = match direction_str {
-                    "asc" => SortCmdDirection::Asc,
-                    "desc" => SortCmdDirection::Desc,
-                    _ => bail!("Sort directions: asc, desc"),
-                };
+    if clause.is_empty() {
+        return Ok(Cmd::OrderBy(None));
+    }
 
-                Ok(Cmd::Sort(Some(column.to_string()), direction))
-            }
-            None => Ok(Cmd::Sort(Some(column.to_string()), default_sort_direction)),
-        },
-        None => Ok(Cmd::Sort(None, SortCmdDirection::Asc)),
-    };
+    return Ok(Cmd::OrderBy(Some(clause.to_string())));
+}
+
+fn parse_where_cmd(input: &str) -> Result<Cmd> {
+    let clause = input
+        .trim()
+        .strip_prefix("where")
+        .or_else(|| input.trim().strip_prefix("w"))
+        .unwrap_or("")
+        .trim();
+
+    if clause.is_empty() {
+        return Ok(Cmd::Where(None));
+    }
+
+    return Ok(Cmd::Where(Some(clause.to_string())));
 }
 
 fn parse_limit_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
@@ -155,10 +160,13 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_unknown_subcommand() {
-        let result = parse_cmd("goto invalid");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unknown goto sub-command"));
+    fn test_parse_goto_table_name() {
+        let result = parse_cmd("goto users");
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            Cmd::Goto(GotoCmd::Table(String::from("users")))
+        );
     }
 
     #[test]
@@ -169,13 +177,64 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_sort_command() {
-        let result = parse_cmd("sort id desc");
+    fn test_parse_order_by_command() {
+        let result = parse_cmd("order-by id desc");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Cmd::OrderBy(Some(String::from("id desc"))));
+
+        let result = parse_cmd("ob created_at desc, id asc");
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            Cmd::Sort(Some(String::from("id")), SortCmdDirection::Desc)
+            Cmd::OrderBy(Some(String::from("created_at desc, id asc")))
         );
+    }
+
+    #[test]
+    fn test_parse_order_by_missing_clause() {
+        let result = parse_cmd("order-by");
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("order-by command requires a clause")
+        );
+
+        let result = parse_cmd("ob");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_where_command() {
+        let result = parse_cmd("where status = 'active'");
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            Cmd::Where(Some(String::from("status = 'active'")))
+        );
+
+        let result = parse_cmd("w id > 10 AND name LIKE '%test%'");
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            Cmd::Where(Some(String::from("id > 10 AND name LIKE '%test%'")))
+        );
+    }
+
+    #[test]
+    fn test_parse_where_missing_clause() {
+        let result = parse_cmd("where");
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("where command requires a clause")
+        );
+
+        let result = parse_cmd("w");
+        assert!(result.is_err());
     }
 
     #[test]

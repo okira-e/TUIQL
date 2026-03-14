@@ -10,6 +10,7 @@ pub struct Theme {
     pub success: Color,
     pub pane_focus: Color,
     pub highlight: Color,
+    pub transparent_background: bool,
 }
 
 impl Theme {
@@ -28,6 +29,7 @@ impl Theme {
             success: p.green,
             pane_focus: p.blue,
             highlight: p.highlight,
+            transparent_background: true,
         }
     }
 }

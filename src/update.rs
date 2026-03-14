@@ -12,7 +12,6 @@ use crate::app::RightView;
 use crate::app::View;
 use crate::commander::GotoCmd;
 use crate::config::project::append_history;
-use crate::drivers::OrderBy;
 use crate::models::explorer_model::ExplorerItem;
 use crate::models::explorer_model::ExplorerItemKind;
 use crate::models::statusline_model::MsgKind;
@@ -340,13 +339,14 @@ impl App {
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
                     let order_by = self.table_model.query_state.order_by.clone();
+                    let where_clause = self.table_model.query_state.where_clause.clone();
                     let offset = self.table_model.query_state.offset;
                     let limit = self.table_model.query_state.limit;
 
                     tokio::spawn(async move {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
-                            let results = driver.query(&table_name, order_by, offset, limit).await?;
+                            let results = driver.query(&table_name, order_by, where_clause, offset, limit).await?;
                             let _ = tx.send(Action::Db(DbAction::QueryTableComplete(results)));
 
                             eyre::Ok(())
@@ -367,11 +367,12 @@ impl App {
 
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
+                    let where_clause = self.table_model.query_state.where_clause.clone();
 
                     tokio::spawn(async move {
                         let res: Result<usize> = async {
                             let mut driver = driver.lock().await;
-                            let count = driver.query_count(&table).await?;
+                            let count = driver.query_count(&table, where_clause).await?;
 
                             eyre::Ok(count)
                         }
@@ -408,9 +409,10 @@ impl App {
                 self.table_model.query_result = results;
 
                 self.table_model.current_page = 0;
-                self.table_model.results_row_count = self.table_model.query_result.rows.len();
+                self.table_model.results_row_count = rows_fetched;
                 self.table_model.ratatui_table_state.select(Some(0));
                 self.table_model.current_page = 0;
+                self.table_model.total_count = None;
                 self.focus_pane(Pane::Right);
 
                 let msg = format!("Fetched {} rows", rows_fetched);
@@ -424,6 +426,7 @@ impl App {
                     let tx = self.action_tx.clone();
                     let table_name = selected_table.clone();
                     let order_by = self.table_model.query_state.order_by.clone();
+                    let where_clause = self.table_model.query_state.where_clause.clone();
                     let mut offset = self.table_model.query_state.offset;
                     let limit = self.table_model.query_state.limit;
 
@@ -431,7 +434,7 @@ impl App {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
                             offset += limit; // new offset
-                            let results = driver.query(&table_name, order_by, offset, limit).await?;
+                            let results = driver.query(&table_name, order_by, where_clause, offset, limit).await?;
                             if !results.rows.is_empty() {
                                 let _ = tx.send(Action::Db(DbAction::NextPageComplete(results, offset)));
                             } else {
@@ -471,6 +474,7 @@ impl App {
                     let tx = self.action_tx.clone();
                     let table_name = selected_table.clone();
                     let order_by = self.table_model.query_state.order_by.clone();
+                    let where_clause = self.table_model.query_state.where_clause.clone();
                     let mut offset = self.table_model.query_state.offset;
                     let limit = self.table_model.query_state.limit;
 
@@ -479,7 +483,7 @@ impl App {
                             offset = offset.saturating_sub(limit);
 
                             let mut driver = driver.lock().await;
-                            let results = driver.query(&table_name, order_by, offset, limit).await?;
+                            let results = driver.query(&table_name, order_by, where_clause, offset, limit).await?;
                             let _ = tx.send(Action::Db(DbAction::PrevPageComplete(results, offset)));
 
                             eyre::Ok(())
@@ -652,6 +656,7 @@ impl App {
                         let db_driver = self.db_driver.clone();
                         let tx = self.action_tx.clone();
                         let order_by = self.table_model.query_state.order_by.clone();
+                        let where_clause = self.table_model.query_state.where_clause.clone();
                         let mut offset = self.table_model.query_state.offset;
                         let limit = self.table_model.query_state.limit;
 
@@ -666,7 +671,7 @@ impl App {
                                     // Fetch with the new offset and commit the new offset and page if there are results.
                                     offset = new_offset;
 
-                                    let results = driver.query(&table, order_by, offset, limit).await?;
+                                    let results = driver.query(&table, order_by, where_clause, offset, limit).await?;
 
                                     if !results.rows.is_empty() {
                                         let _ = tx.send(Action::Db(DbAction::GotoPageComplete(
@@ -716,25 +721,60 @@ impl App {
                     }
                 }
             },
-            AppCmd::Sort(column, direction) => match self.table_model.table_name.clone() {
+            AppCmd::OrderBy(clause) => match self.table_model.table_name.clone() {
                 Some(table) => {
                     self.update(Action::App(AppAction::StartLoading));
 
-                    let order_by = match column {
-                        Some(col) => Some(OrderBy::new(vec![col], direction)),
-                        None => None,
-                    };
-                    self.table_model.query_state.order_by = order_by.clone();
+                    self.table_model.query_state.order_by = clause.clone();
                     self.table_model.query_state.offset = 0;
 
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
                     let limit = self.table_model.query_state.limit;
+                    let where_clause = self.table_model.query_state.where_clause.clone();
 
                     tokio::spawn(async move {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
-                            let results = driver.query(&table, order_by, 0, limit).await?;
+                            let results = driver.query(&table, clause, where_clause, 0, limit).await?;
+                            let _ = tx.send(Action::Db(DbAction::QueryTableComplete(results)));
+
+                            eyre::Ok(())
+                        }
+                        .await;
+
+                        let _ = tx.send(Action::App(AppAction::StopLoading));
+
+                        if let Err(err) = res {
+                            let _ = tx.send(Action::App(AppAction::ReportError(err)));
+                        }
+                    });
+                }
+                None => {
+                    self.report_message(
+                        "No table is currently selected",
+                        MsgKind::Error,
+                        MsgLifetime::Short,
+                    );
+                    self.focus_pane(Pane::Left);
+                }
+            },
+            AppCmd::Where(clause) => match self.table_model.table_name.clone() {
+                Some(table) => {
+                    self.update(Action::App(AppAction::StartLoading));
+
+                    self.table_model.query_state.where_clause = clause.clone();
+                    self.table_model.query_state.offset = 0;
+
+                    let driver = self.db_driver.clone();
+                    let tx = self.action_tx.clone();
+                    let limit = self.table_model.query_state.limit;
+                    let order_by = self.table_model.query_state.order_by.clone();
+
+                    tokio::spawn(async move {
+                        let res: Result<()> = async {
+                            let mut driver = driver.lock().await;
+                            let results = driver.query(&table, order_by, clause, 0, limit).await?;
                             let _ = tx.send(Action::Db(DbAction::QueryTableComplete(results)));
 
                             eyre::Ok(())
@@ -768,11 +808,12 @@ impl App {
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
                     let order_by = self.table_model.query_state.order_by.clone();
+                    let where_clause = self.table_model.query_state.where_clause.clone();
 
                     tokio::spawn(async move {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
-                            let results = driver.query(&table, order_by, 0, limit).await?;
+                            let results = driver.query(&table, order_by, where_clause, 0, limit).await?;
                             let _ = tx.send(Action::Db(DbAction::QueryTableComplete(results)));
 
                             eyre::Ok(())

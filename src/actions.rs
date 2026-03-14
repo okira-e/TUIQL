@@ -1,5 +1,4 @@
 use crate::commander::GotoCmd;
-use crate::drivers::OrderByDirection;
 use crate::drivers::QueryResult;
 use crate::models::statusline_model::MsgKind;
 use crate::models::statusline_model::MsgLifetime;
@@ -96,7 +95,8 @@ pub enum CmdLineAction {
 pub enum AppCmd {
     Count,
     Goto(GotoCmd),
-    Sort(Option<String>, OrderByDirection),
+    OrderBy(Option<String>),
+    Where(Option<String>),
     Limit(usize),
 }
 

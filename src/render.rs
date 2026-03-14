@@ -13,7 +13,11 @@ impl App {
     pub fn render(&mut self, frame: &mut Frame) {
         let root = frame.area();
         // Set app-wide background
-        let bg = Block::default().style(Style::default().bg(self.theme.bg));
+        let bg = if self.theme.transparent_background {
+            Block::default()
+        } else {
+            Block::default().style(Style::default().bg(self.theme.bg))
+        };
         frame.render_widget(bg, root);
         let focused_view = self.get_focused_view();
 
