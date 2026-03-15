@@ -23,7 +23,7 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
     let container_border_style = if focused {
         Style::default().fg(theme.pane_focus)
     } else {
-        Style::default().bg(theme.bg)
+        Style::default()
     };
 
     let page = if model.query_result.rows.is_empty() {

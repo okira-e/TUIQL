@@ -6,6 +6,7 @@ use crate::commander::Cmd;
 use crate::commander::parse_cmd;
 use crate::config::project::ProjectConfig;
 use crate::config::settings::Settings;
+use crate::config::settings::update_settings;
 use crate::drivers;
 use crate::drivers::DbDriver;
 use crate::models::explorer_model::ExplorerItem;
@@ -21,6 +22,7 @@ use crate::models::table_model::TableModel;
 use crate::theme::Flavor;
 use crate::theme::Theme;
 use color_eyre::Result;
+use color_eyre::eyre::bail;
 use crossterm::event::EventStream;
 use ratatui::DefaultTerminal;
 use ratatui::layout::Constraint;
@@ -83,7 +85,7 @@ pub struct App {
     pub theme: Theme,
     pub area: Rect,
     pub is_loading: bool,
-    pub prev_pane: Pane,
+    pub prev_focused_pane: Pane,
 }
 
 impl App {
@@ -110,7 +112,7 @@ impl App {
             json_view_model: JsonViewModel::default(),
             area: Rect::default(),
             is_loading: false,
-            prev_pane: Pane::Left,
+            prev_focused_pane: Pane::Left,
         };
     }
 
@@ -231,11 +233,12 @@ impl App {
             Cmd::Where(clause) => Ok(Action::Cmd(AppCmd::Where(clause))),
             Cmd::Limit(limit) => Ok(Action::Cmd(AppCmd::Limit(limit))),
             Cmd::RefreshTable => Ok(Action::Db(DbAction::QueryTable)),
+            Cmd::Set(key, value) => Ok(Action::Cmd(AppCmd::SettingChange(key, value))),
         };
     }
 
     pub fn focus_pane(&mut self, pane: Pane) {
-        self.prev_pane = self.focused_pane;
+        self.prev_focused_pane = self.focused_pane;
         self.focused_pane = pane;
     }
 
@@ -245,5 +248,29 @@ impl App {
         self.table_model.query_state = Default::default();
 
         let _ = self.action_tx.send(Action::Db(DbAction::QueryTable));
+    }
+
+    pub fn update_settings(&mut self, key: String, value_input: Option<String>) -> Result<()> {
+        match key.as_str() {
+            "transparent_background" => {
+                let value = match value_input {
+                    None => true,
+                    Some(input) => {
+                        if let Ok(bool_val) = input.parse::<bool>() {
+                            bool_val
+                        } else {
+                            bail!("Expected values: true, false");
+                        }
+                    }
+                };
+
+                self.settings.transparent_background = value;
+            }
+            _ => bail!("Unknown settings key: {}", key),
+        }
+
+        self.settings = update_settings(&self.settings)?;
+
+        return Ok(());
     }
 }

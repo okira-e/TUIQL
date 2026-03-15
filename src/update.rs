@@ -12,6 +12,7 @@ use crate::app::RightView;
 use crate::app::View;
 use crate::commander::GotoCmd;
 use crate::config::project::append_history;
+use crate::config::settings::update_settings;
 use crate::models::explorer_model::ExplorerItem;
 use crate::models::explorer_model::ExplorerItemKind;
 use crate::models::statusline_model::MsgKind;
@@ -624,7 +625,7 @@ impl App {
                 }
 
                 self.statusline_model.cmd.cursor = cursor;
-            },
+            }
             CmdLineAction::SetText(text) => {
                 self.statusline_model.mode = StatusLineMode::Command;
                 self.statusline_model.cmd.text = text;
@@ -682,7 +683,7 @@ impl App {
                 }
             }
             CmdLineAction::Exit => {
-                self.focus_pane(self.prev_pane);
+                self.focus_pane(self.prev_focused_pane);
                 self.statusline_model = StatusLineModel::default();
             }
         }
@@ -877,6 +878,12 @@ impl App {
                     );
                 }
             },
+            AppCmd::SettingChange(key, value) => {
+                if let Err(err) = self.update_settings(key, value) {
+                    self.report_message(&err.to_string(), MsgKind::Error, MsgLifetime::Long);
+                }
+                self.focus_pane(self.prev_focused_pane);
+            }
         };
     }
 

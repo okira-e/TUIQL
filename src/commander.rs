@@ -14,6 +14,7 @@ pub enum Cmd {
     Where(Option<String>),
     Limit(usize),
     RefreshTable,
+    Set(String, Option<String>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -35,6 +36,7 @@ pub fn parse_cmd(input: &str) -> Result<Cmd> {
             "w" | "where" => parse_where_cmd(input),
             "l" | "limit" => parse_limit_cmd(&mut iter),
             "r" | "refresh" => Ok(Cmd::RefreshTable),
+            "set" => parse_set_cmd(&mut iter),
             _ => bail!("Unknown command: {}", cmd),
         },
         None => bail!("Empty command"),
@@ -113,6 +115,17 @@ fn parse_limit_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
             Ok(Cmd::Limit(limit))
         }
         None => bail!("Limit command requires a number as an argument"),
+    };
+}
+
+fn parse_set_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
+    return match iter.next() {
+        Some(key) => {
+            let value: Option<String> = iter.next().map(String::from);
+
+            Ok(Cmd::Set(key.to_string(), value))
+        }
+        None => bail!("Set command needs a key at least"),
     };
 }
 

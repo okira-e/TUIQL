@@ -41,7 +41,7 @@ pub async fn run(args: args::AppArgs) -> Result<()> {
             None => {
                 let app_name = env!("CARGO_PKG_NAME");
                 println!(
-                    "Config files are not created yet. Run \"{} init\" to initialize a config.",
+                    "Config files are not created yet! Start using {} to create it.",
                     app_name
                 )
             }

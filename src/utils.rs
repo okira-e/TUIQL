@@ -25,6 +25,14 @@ pub fn centered_rect_pct(w_pct: u16, h_pct: u16, area: Rect) -> Rect {
     return Rect { x, y, width: w, height: h };
 }
 
+pub fn default_false() -> bool {
+    return false;
+}
+
+pub fn default_true() -> bool {
+    return true;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

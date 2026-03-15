@@ -24,7 +24,7 @@ pub fn render_explorer(model: &mut ExplorerModel, theme: &Theme, frame: &mut Fra
     let border_style = if focused {
         Style::default().fg(theme.pane_focus)
     } else {
-        Style::default().bg(theme.bg)
+        Style::default()
     };
 
     //
