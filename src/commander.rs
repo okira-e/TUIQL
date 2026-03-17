@@ -9,6 +9,7 @@ pub enum Cmd {
     Quit,
     /// Returns the total count of the currently selected table
     Count,
+    TotalCount,
     Goto(GotoCmd),
     OrderBy(Option<String>),
     Where(Option<String>),
@@ -31,6 +32,7 @@ pub fn parse_cmd(input: &str) -> Result<Cmd> {
         Some(cmd) => match cmd {
             "q" | "quit" => Ok(Cmd::Quit),
             "c" | "count" => Ok(Cmd::Count),
+            "tc" | "total-count" => Ok(Cmd::TotalCount),
             "g" | "goto" => parse_goto_cmd(&mut iter),
             "ob" | "order-by" => parse_order_by_cmd(input),
             "w" | "where" => parse_where_cmd(input),
@@ -143,7 +145,7 @@ fn parse_metric(input: &str) -> Option<usize> {
         _ => return None,
     };
 
-    Some((n * multiplier) as usize)
+    return Some((n * multiplier) as usize);
 }
 
 #[cfg(test)]

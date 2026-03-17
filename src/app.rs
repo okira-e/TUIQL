@@ -5,8 +5,6 @@ use crate::actions::DbAction;
 use crate::commander::Cmd;
 use crate::commander::parse_cmd;
 use crate::config::project::ProjectConfig;
-use crate::config::settings::Settings;
-use crate::config::settings::update_settings;
 use crate::drivers;
 use crate::drivers::DbDriver;
 use crate::models::explorer_model::ExplorerItem;
@@ -18,11 +16,12 @@ use crate::models::statusline_model::MsgLifetime;
 use crate::models::statusline_model::StatusLineMode;
 use crate::models::statusline_model::StatusLineModel;
 use crate::models::statusline_model::StatusLineMsg;
+use crate::models::table_model::QueryState;
 use crate::models::table_model::TableModel;
+use crate::settings::Settings;
 use crate::theme::Flavor;
 use crate::theme::Theme;
 use color_eyre::Result;
-use color_eyre::eyre::bail;
 use crossterm::event::EventStream;
 use ratatui::DefaultTerminal;
 use ratatui::layout::Constraint;
@@ -94,19 +93,21 @@ impl App {
 
         let theme = Theme::catppuccin(Flavor::Mocha);
 
+        let table_model = TableModel::new(&settings);
+
         return Self {
-            settings,
-            config,
+            settings: settings,
+            config: config,
             running: false,
             event_stream: EventStream::new(),
-            action_tx,
-            action_rx,
+            action_tx: action_tx,
+            action_rx: action_rx,
             db_driver: Arc::new(Mutex::new(db_driver)),
-            theme,
+            theme: theme,
             focused_pane: Pane::Left,
             right_view: RightView::ResultsTable,
             widgets_chunks: WidgetsChunks::default(),
-            table_model: TableModel::default(),
+            table_model: table_model,
             explorer_model: ExplorerModel::default(),
             statusline_model: StatusLineModel::default(),
             json_view_model: JsonViewModel::default(),
@@ -228,6 +229,7 @@ impl App {
         return match parse_cmd(cmd)? {
             Cmd::Quit => Ok(Action::App(AppAction::Quit)),
             Cmd::Count => Ok(Action::Cmd(AppCmd::Count)),
+            Cmd::TotalCount => Ok(Action::Cmd(AppCmd::TotalCount)),
             Cmd::Goto(sub_cmd) => Ok(Action::Cmd(AppCmd::Goto(sub_cmd))),
             Cmd::OrderBy(clause) => Ok(Action::Cmd(AppCmd::OrderBy(clause))),
             Cmd::Where(clause) => Ok(Action::Cmd(AppCmd::Where(clause))),
@@ -245,32 +247,8 @@ impl App {
     pub fn select_table(&mut self, name: String) {
         self.table_model.table_name = Some(name.clone());
         self.table_model.reset_ui(Some(0));
-        self.table_model.query_state = Default::default();
+        self.table_model.query_state = QueryState::new(&self.settings);
 
         let _ = self.action_tx.send(Action::Db(DbAction::QueryTable));
-    }
-
-    pub fn update_settings(&mut self, key: String, value_input: Option<String>) -> Result<()> {
-        match key.as_str() {
-            "transparent_background" => {
-                let value = match value_input {
-                    None => true,
-                    Some(input) => {
-                        if let Ok(bool_val) = input.parse::<bool>() {
-                            bool_val
-                        } else {
-                            bail!("Expected values: true, false");
-                        }
-                    }
-                };
-
-                self.settings.transparent_background = value;
-            }
-            _ => bail!("Unknown settings key: {}", key),
-        }
-
-        self.settings = update_settings(&self.settings)?;
-
-        return Ok(());
     }
 }

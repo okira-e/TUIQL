@@ -1,17 +1,8 @@
 use crate::config::get_config_dir_path_based_on_os;
-use crate::utils::default_false;
+use crate::settings::Settings;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
-use serde::Deserialize;
-use serde::Serialize;
-use serde_json::Value;
 use std::fs::File;
-
-#[derive(Debug, Deserialize, Serialize, Default)]
-pub struct Settings {
-    #[serde(default = "default_false")]
-    pub transparent_background: bool,
-}
 
 pub fn load_settings() -> Result<Settings> {
     let config_path = match get_config_dir_path_based_on_os()? {

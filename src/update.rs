@@ -12,7 +12,6 @@ use crate::app::RightView;
 use crate::app::View;
 use crate::commander::GotoCmd;
 use crate::config::project::append_history;
-use crate::config::settings::update_settings;
 use crate::models::explorer_model::ExplorerItem;
 use crate::models::explorer_model::ExplorerItemKind;
 use crate::models::statusline_model::MsgKind;
@@ -103,6 +102,10 @@ impl App {
             AppAction::StopLoading => self.is_loading = false,
             AppAction::ReportMessage(msg, msg_kind, msg_lifetime) => {
                 self.report_message(&msg, msg_kind, msg_lifetime);
+            }
+            AppAction::UpdateQueryState(where_clause, order_by) => {
+                self.table_model.query_state.where_clause = where_clause.clone();
+                self.table_model.query_state.order_by = order_by.clone();
             }
         }
     }
@@ -362,13 +365,17 @@ impl App {
                     });
                 }
             }
-            DbAction::QueryCount => match self.table_model.table_name.clone() {
+            DbAction::QueryCount(ignore_filters) => match self.table_model.table_name.clone() {
                 Some(table) => {
                     self.update(Action::App(AppAction::StartLoading));
 
                     let driver = self.db_driver.clone();
                     let tx = self.action_tx.clone();
-                    let where_clause = self.table_model.query_state.where_clause.clone();
+                    let where_clause = if ignore_filters {
+                        None
+                    } else {
+                        self.table_model.query_state.where_clause.clone()
+                    };
 
                     tokio::spawn(async move {
                         let res: Result<usize> = async {
@@ -380,7 +387,10 @@ impl App {
                         .await;
 
                         let _ = tx.send(Action::App(AppAction::StopLoading));
-                        let _ = tx.send(Action::Db(DbAction::QueryCountComplete(res)));
+                        let _ = tx.send(Action::Db(DbAction::QueryCountComplete(
+                            ignore_filters,
+                            res,
+                        )));
                     });
                     self.focus_pane(Pane::Right);
                 }
@@ -393,15 +403,21 @@ impl App {
                     self.focus_pane(Pane::Left);
                 }
             },
-            DbAction::QueryCountComplete(res) => match res {
+            DbAction::QueryCountComplete(ignored_filters, res) => match res {
                 Ok(count) => {
-                    let msg = format!("Total rows: {}", count);
+                    let msg = format!(
+                        "{} rows: {}",
+                        if ignored_filters { "Total" } else { "Filterd" },
+                        count
+                    );
                     let _ = self.update(Action::App(AppAction::ReportMessage(
                         msg,
                         MsgKind::Neutral,
                         MsgLifetime::Long,
                     )));
-                    self.table_model.total_count = Some(count);
+                    if !ignored_filters {
+                        self.table_model.total_count = Some(count);
+                    }
                 }
                 Err(err) => self.update(Action::App(AppAction::ReportError(err))),
             },
@@ -691,7 +707,8 @@ impl App {
 
     fn update_cmd(&mut self, action: AppCmd) {
         match action {
-            AppCmd::Count => self.update(Action::Db(DbAction::QueryCount)),
+            AppCmd::Count => self.update(Action::Db(DbAction::QueryCount(false))),
+            AppCmd::TotalCount => self.update(Action::Db(DbAction::QueryCount(true))),
             AppCmd::Goto(sub_cmd) => match sub_cmd {
                 GotoCmd::Page(page) => match self.table_model.table_name.clone() {
                     Some(table) => {
@@ -767,7 +784,6 @@ impl App {
                 Some(table) => {
                     self.update(Action::App(AppAction::StartLoading));
 
-                    self.table_model.query_state.order_by = clause.clone();
                     self.table_model.query_state.offset = 0;
 
                     let driver = self.db_driver.clone();
@@ -778,8 +794,14 @@ impl App {
                     tokio::spawn(async move {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
-                            let results = driver.query(&table, clause, where_clause, 0, limit).await?;
+                            let results = driver
+                                .query(&table, clause.clone(), where_clause.clone(), 0, limit)
+                                .await?;
                             let _ = tx.send(Action::Db(DbAction::QueryTableComplete(results)));
+                            let _ = tx.send(Action::App(AppAction::UpdateQueryState(
+                                where_clause.clone(),
+                                clause.clone(),
+                            )));
 
                             eyre::Ok(())
                         }
@@ -805,7 +827,6 @@ impl App {
                 Some(table) => {
                     self.update(Action::App(AppAction::StartLoading));
 
-                    self.table_model.query_state.where_clause = clause.clone();
                     self.table_model.query_state.offset = 0;
 
                     let driver = self.db_driver.clone();
@@ -816,8 +837,12 @@ impl App {
                     tokio::spawn(async move {
                         let res: Result<()> = async {
                             let mut driver = driver.lock().await;
-                            let results = driver.query(&table, order_by, clause, 0, limit).await?;
+                            let results = driver.query(&table, order_by.clone(), clause.clone(), 0, limit).await?;
                             let _ = tx.send(Action::Db(DbAction::QueryTableComplete(results)));
+                            let _ = tx.send(Action::App(AppAction::UpdateQueryState(
+                                clause.clone(),
+                                order_by.clone(),
+                            )));
 
                             eyre::Ok(())
                         }

@@ -69,23 +69,23 @@ tuiql ls
 | --- | ---------------------- |
 | w   | Add a WHERE clause     |
 | o   | Add an ORDER BY clause |
+| r   | Refresh query result   |
 
 ### Command Mode
 
 Press `:` to enter command mode.
 
-| Command               | Action                              |
-| --------------------- | ----------------------------------- |
-| (q)uit                | Quit the application                |
-| (c)ount               | Count rows in the selected table    |
-| (g)oto (p)age 5       | Jump to a specific page             |
-| (l)imit 1000\|1k      | Set rows per page                   |
-| (r)efresh             | Re-fetch data with current filters  |
-| (o)rder-(b)y col desc | Add ORDER BY (no args to reset)     |
-| (w)here col = 'val'   | Add WHERE clause (no args to reset) |
-| (s)et key value       | Change a setting at runtime         |
-
-Most commands support short aliases (`:q`, `:c`, etc).
+| Command           | Shorthand | Action                                                       |
+| ----------------- | --------- | ------------------------------------------------------------ |
+| quit              | q         | Quit the application                                         |
+| count             | c         | Count fetched rows                                           |
+| total-count       | tc        | Count total rows in the selected table regardless of filters |
+| goto page 5       | g p       | Jump to a specific page                                      |
+| limit 1000\|1k    | l         | Set rows per page                                            |
+| refresh           | r         | Re-fetch data with current filters                           |
+| order-by col desc | ob        | Add ORDER BY (no args to reset)                              |
+| where col = 'val' | w         | Add WHERE clause (no args to reset)                          |
+| set key value     | s         | Change a setting at runtime                                  |
 
 ## Features
 
@@ -102,9 +102,10 @@ Run `tuiql --config-path` to see where your config files are stored.
 
 ### Settings
 
-| Setting                | Options         | Description                                    |
-| ---------------------- | --------------- | ---------------------------------------------- |
-| transparent_background | `true`, `false` | Use terminal background instead of theme color |
+| Setting                | Options         | Default | Description                                    |
+| ---------------------- | --------------- | ------- | ---------------------------------------------- |
+| transparent_background | `true`, `false` | `false` | Use terminal background instead of theme color |
+| default_limit          | number          | `200`   | Sets the default query limit on every table    |
 
 ## License
 

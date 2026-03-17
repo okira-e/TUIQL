@@ -31,6 +31,8 @@ pub enum AppAction {
     ReportError(eyre::Report),
     StartLoading,
     StopLoading,
+    /// Updates the where and the order_by in the query state respectively
+    UpdateQueryState(Option<String>, Option<String>),
 }
 
 #[derive(Debug)]
@@ -60,8 +62,10 @@ pub enum ResultsTableAction {
 
 pub enum DbAction {
     QueryTable,
-    QueryCount,
-    QueryCountComplete(Result<usize>),
+    /// Takes a flag for ignoring the applied query state filters
+    QueryCount(bool),
+    /// First flag is for if we ignored the applied query state filters
+    QueryCountComplete(bool, Result<usize>),
     QueryTableComplete(QueryResult),
     NextPage,
     NextPageComplete(QueryResult, usize),
@@ -98,6 +102,7 @@ pub enum CmdLineAction {
 #[derive(Debug)]
 pub enum AppCmd {
     Count,
+    TotalCount,
     Goto(GotoCmd),
     OrderBy(Option<String>),
     Where(Option<String>),
@@ -111,8 +116,12 @@ impl fmt::Debug for DbAction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DbAction::QueryTable => f.write_str("QueryTable"),
-            DbAction::QueryCount => f.write_str("QueryCount"),
-            DbAction::QueryCountComplete(r) => f.debug_tuple("QueryCountComplete").field(r).finish(),
+            DbAction::QueryCount(ignore_filters) => f.debug_tuple("QueryCount").field(&ignore_filters).finish(),
+            DbAction::QueryCountComplete(ignored_filters, r) => f
+                .debug_tuple("QueryCountComplete")
+                .field(&ignored_filters)
+                .field(&r)
+                .finish(),
 
             DbAction::QueryTableComplete(_) => f.debug_tuple("QueryTableComplete").field(&"<QueryResult>").finish(),
             DbAction::NextPage => f.write_str("NextPage"),

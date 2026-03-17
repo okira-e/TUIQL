@@ -32,44 +32,74 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
         model.current_page + 1
     };
 
+    let page_info = if let Some(total_count) = model.total_count {
+        let total_pages = (total_count as f64 / model.query_state.limit as f64).ceil();
+        format!("Page {}/{} - Rows {}", page, total_pages, model.results_row_count)
+    } else {
+        format!("Page {} - Rows {}", page, model.results_row_count)
+    };
+
+    let title = model.table_name.clone().unwrap_or("Query Result".to_string());
+
     let mut container_block = Block::default()
-        .title("Query Result".to_string())
+        .title(title)
         .title(
-            Line::from(model.table_name.clone().unwrap_or(String::new()))
+            Line::from(page_info)
                 .style(theme.fg)
-                .alignment(Alignment::Right),
+                .alignment(Alignment::Center),
         )
         .border_style(container_border_style)
         .borders(Borders::ALL);
+
+    if let Some(total_count) = model.total_count {
+        container_block = container_block.title(
+            Line::from(format!("Total Count: {}", total_count))
+                .style(theme.fg)
+                .alignment(Alignment::Right),
+        );
+    }
 
     //
     // Set the total count/pages of the table if it has been fetched.
     //
 
-    if let Some(total_count) = model.total_count {
-        let total_pages = (total_count as f64 / model.query_state.limit as f64).ceil();
+    // Build left-aligned bottom title with active where/order-by clauses
+    let max_clause_len = (area.width as usize).saturating_sub(2) / 2;
+    let mut clauses: Vec<Span> = vec![];
 
-        container_block = container_block
-            .title_bottom(
-                Line::from(format!(
-                    "Page {}/{} - Rows {}",
-                    page, total_pages, model.results_row_count
-                ))
-                .style(theme.fg)
-                .alignment(Alignment::Center),
-            )
-            .title_bottom(
-                Line::from(format!("Total Count: {}", total_count))
-                    .style(theme.fg)
-                    .alignment(Alignment::Right),
-            );
-    } else {
-        container_block = container_block.title_bottom(
-            Line::from(format!("Page {} - Rows {}", page, model.results_row_count))
-                .style(theme.fg)
-                .alignment(Alignment::Center),
-        )
+    if let Some(ref where_clause) = model.query_state.where_clause {
+        let label = "WHERE: ";
+        let max_val = max_clause_len.saturating_sub(label.len());
+        let value = if where_clause.len() > max_val {
+            format!("{}…", &where_clause[..max_val.saturating_sub(1)])
+        } else {
+            where_clause.clone()
+        };
+        clauses.push(Span::styled(label, Style::default().fg(Color::DarkGray)));
+        clauses.push(Span::styled(value, theme.fg));
     }
+
+    if let Some(ref order_by) = model.query_state.order_by {
+        if !clauses.is_empty() {
+            clauses.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+        }
+        let label = "ORDER: ";
+        let max_val = max_clause_len.saturating_sub(label.len());
+        let value = if order_by.len() > max_val {
+            format!("{}…", &order_by[..max_val.saturating_sub(1)])
+        } else {
+            order_by.clone()
+        };
+        clauses.push(Span::styled(label, Style::default().fg(Color::DarkGray)));
+        clauses.push(Span::styled(value, theme.fg));
+    }
+
+    if !clauses.is_empty() {
+        container_block = container_block.title_bottom(
+            Line::from(clauses).alignment(Alignment::Left),
+        );
+    }
+
 
     frame.render_widget(&container_block, area);
 

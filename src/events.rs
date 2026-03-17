@@ -118,6 +118,11 @@ impl App {
                     return;
                 }
 
+                (_, KeyCode::Char('r')) => {
+                    self.update(Action::Db(DbAction::QueryTable));
+                    return;
+                }
+
                 (_, KeyCode::Char('w')) => {
                     self.update(Action::CmdLine(CmdLineAction::SetText(String::from(
                         "where ",

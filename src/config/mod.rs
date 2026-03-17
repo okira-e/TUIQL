@@ -3,7 +3,7 @@ pub mod project;
 pub mod settings;
 
 use crate::config::connection::Connection;
-use crate::config::settings::Settings;
+use crate::settings::Settings;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
 use std::fs;

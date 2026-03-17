@@ -1,5 +1,6 @@
 mod actions;
 mod app;
+mod settings;
 mod cli;
 mod commander;
 mod config;

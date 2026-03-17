@@ -1,5 +1,6 @@
 use crate::drivers::ColumnMetadata;
 use crate::drivers::QueryResult;
+use crate::settings::Settings;
 use ratatui::layout::Constraint;
 use ratatui::widgets::TableState;
 use serde_json::Value;
@@ -9,7 +10,9 @@ pub struct TableModel {
     pub table_name: Option<String>,
     pub query_state: QueryState,
     pub query_result: QueryResult,
+    /// Current view's row count. Rows that got fetched
     pub results_row_count: usize,
+    /// Total count of data (including filteration)
     pub total_count: Option<usize>,
     /// Dictates how many columns to skip horizontally
     pub horizontal_scroll_offset: usize,
@@ -22,6 +25,21 @@ impl Default for TableModel {
         Self {
             table_name: Default::default(),
             query_state: Default::default(),
+            query_result: QueryResult::default(),
+            results_row_count: Default::default(),
+            total_count: Default::default(),
+            horizontal_scroll_offset: Default::default(),
+            ratatui_table_state: Default::default(),
+            current_page: Default::default(),
+        }
+    }
+}
+
+impl TableModel {
+    pub fn new(settings: &Settings) -> Self {
+        Self {
+            table_name: Default::default(),
+            query_state: QueryState::new(settings),
             query_result: QueryResult::default(),
             results_row_count: Default::default(),
             total_count: Default::default(),
@@ -96,6 +114,17 @@ impl Default for QueryState {
         Self {
             offset: 0,
             limit: 200,
+            order_by: Default::default(),
+            where_clause: None,
+        }
+    }
+}
+
+impl QueryState {
+    pub fn new(settings: &Settings) -> Self {
+        Self {
+            offset: 0,
+            limit: settings.default_limit as usize,
             order_by: Default::default(),
             where_clause: None,
         }
