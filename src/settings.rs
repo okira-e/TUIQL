@@ -1,8 +1,6 @@
 use crate::app::App;
 use crate::config::settings::update_settings;
 use crate::models::table_model::QueryState;
-use crate::utils::serde_utils::default_false;
-use crate::utils::serde_utils::default_limit;
 use color_eyre::eyre::Result;
 use color_eyre::eyre::bail;
 use serde::Deserialize;
@@ -14,6 +12,9 @@ pub struct Settings {
     pub transparent_background: bool,
     #[serde(default = "default_limit")]
     pub default_limit: u16,
+    /// "asc" or "desc"
+    #[serde(default = "default_sort")]
+    pub default_sort: String,
 }
 
 impl App {
@@ -47,6 +48,17 @@ impl App {
 
                 self.settings.default_limit = value;
             }
+            "default_sort" => {
+                let value = match value_input {
+                    None => default_sort(),
+                    Some(input) => match input.as_str() {
+                        "asc" | "desc" => input,
+                        _ => bail!("Expected values: asc, desc"),
+                    },
+                };
+
+                self.settings.default_sort = value;
+            }
             _ => bail!("Unknown settings key: {}", key),
         }
 
@@ -54,4 +66,16 @@ impl App {
 
         return Ok(());
     }
+}
+
+pub fn default_false() -> bool {
+    return false;
+}
+
+pub fn default_limit() -> u16 {
+    return 200;
+}
+
+pub fn default_sort() -> String {
+    return String::from("asc");
 }

@@ -49,6 +49,7 @@ impl App {
                     frame,
                     self.widgets_chunks.table_chunk,
                     focused_view == View::ResultsTable,
+                    &self.settings.default_sort,
                 );
             }
         }

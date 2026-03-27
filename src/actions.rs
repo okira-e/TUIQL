@@ -93,6 +93,8 @@ pub enum CmdLineAction {
     MoveLeftWord,
     MoveRightWord,
     SetText(String),
+    ToggleWhereClause,
+    ToggleOrderByClause,
     TogglePrevCommand,
     ToggleNextCommand,
     Execute,

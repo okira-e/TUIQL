@@ -25,16 +25,6 @@ pub fn centered_rect_pct(w_pct: u16, h_pct: u16, area: Rect) -> Rect {
     return Rect { x, y, width: w, height: h };
 }
 
-pub mod serde_utils {
-    pub fn default_false() -> bool {
-        return false;
-    }
-
-    pub fn default_limit() -> u16 {
-        return 200;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -124,16 +124,12 @@ impl App {
                 }
 
                 (_, KeyCode::Char('w')) => {
-                    self.update(Action::CmdLine(CmdLineAction::SetText(String::from(
-                        "where ",
-                    ))));
+                    self.update(Action::CmdLine(CmdLineAction::ToggleWhereClause));
                     return;
                 }
 
                 (_, KeyCode::Char('o')) => {
-                    self.update(Action::CmdLine(CmdLineAction::SetText(String::from(
-                        "order-by ",
-                    ))));
+                    self.update(Action::CmdLine(CmdLineAction::ToggleOrderByClause));
                     return;
                 }
 

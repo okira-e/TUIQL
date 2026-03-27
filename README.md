@@ -102,11 +102,19 @@ Run `tuiql --config-path` to see where your config files are stored.
 
 ### Settings
 
-| Setting                | Options         | Default | Description                                    |
-| ---------------------- | --------------- | ------- | ---------------------------------------------- |
-| transparent_background | `true`, `false` | `false` | Use terminal background instead of theme color |
-| default_limit          | number          | `200`   | Sets the default query limit on every table    |
+| Setting                | Options         | Default | Description                                      |
+| ---------------------- | --------------- | ------- | ------------------------------------------------ |
+| transparent_background | `true`, `false` | `false` | Use terminal background instead of theme color   |
+| default_limit          | number          | `200`   | Sets the default query limit on every table      |
+| default_sort           | "asc", "desc"   | "asc"   | Sets the default sorting direction on table load |
 
 ## License
 
-MIT
+This project is licensed under the MIT license - see the [LICENSE](LICENSE) file for details.
+
+## Testing
+
+Testing this app is done with the following free sample databases:
+
+- Postgres: [pagila](https://github.com/devrimgunduz/pagila)
+- Mysql: [sakila](https://dev.mysql.com/doc/sakila/en/sakila-installation.html)

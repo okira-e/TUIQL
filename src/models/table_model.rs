@@ -1,6 +1,7 @@
 use crate::drivers::ColumnMetadata;
 use crate::drivers::QueryResult;
 use crate::settings::Settings;
+use crate::settings::default_limit;
 use ratatui::layout::Constraint;
 use ratatui::widgets::TableState;
 use serde_json::Value;
@@ -105,7 +106,7 @@ impl TableModel {
 pub struct QueryState {
     pub offset: usize,
     pub limit: usize,
-    pub order_by: Option<String>,
+    pub order_by_clause: Option<String>,
     pub where_clause: Option<String>,
 }
 
@@ -113,8 +114,8 @@ impl Default for QueryState {
     fn default() -> Self {
         Self {
             offset: 0,
-            limit: 200,
-            order_by: Default::default(),
+            limit: default_limit() as usize,
+            order_by_clause: Default::default(),
             where_clause: None,
         }
     }
@@ -125,7 +126,7 @@ impl QueryState {
         Self {
             offset: 0,
             limit: settings.default_limit as usize,
-            order_by: Default::default(),
+            order_by_clause: Default::default(),
             where_clause: None,
         }
     }
@@ -223,7 +224,12 @@ mod tests {
 
     #[test]
     fn test_calculate_total_pages() {
-        let qs = QueryState { offset: 0, limit: 50, order_by: None, where_clause: None };
+        let qs = QueryState {
+            offset: 0,
+            limit: 50,
+            order_by_clause: None,
+            where_clause: None,
+        };
 
         // Exact pages
         assert_eq!(calculate_total_pages(&qs, 200), 4);
@@ -236,23 +242,43 @@ mod tests {
 
     #[test]
     fn test_calculate_total_pages_edge_cases() {
-        let qs = QueryState { offset: 0, limit: 50, order_by: None, where_clause: None };
+        let qs = QueryState {
+            offset: 0,
+            limit: 50,
+            order_by_clause: None,
+            where_clause: None,
+        };
 
         assert_eq!(calculate_total_pages(&qs, 0), 0);
         assert_eq!(calculate_total_pages(&qs, 1), 1);
 
         // Zero limit edge case
-        let qs_zero = QueryState { offset: 0, limit: 0, order_by: None, where_clause: None };
+        let qs_zero = QueryState {
+            offset: 0,
+            limit: 0,
+            order_by_clause: None,
+            where_clause: None,
+        };
         assert_eq!(calculate_total_pages(&qs_zero, 100), 0);
     }
 
     #[test]
     fn test_prev_page_offset_saturating() {
         // Test saturating_sub edge cases
-        let qs = QueryState { offset: 0, limit: 50, order_by: None, where_clause: None };
+        let qs = QueryState {
+            offset: 0,
+            limit: 50,
+            order_by_clause: None,
+            where_clause: None,
+        };
         assert_eq!(prev_page_offset(&qs,), 0); // Should saturate at 0
 
-        let qs = QueryState { offset: 25, limit: 50, order_by: None, where_clause: None };
+        let qs = QueryState {
+            offset: 25,
+            limit: 50,
+            order_by_clause: None,
+            where_clause: None,
+        };
         assert_eq!(prev_page_offset(&qs,), 0); // 25 - 50 would be negative, saturates to 0
     }
 }

@@ -38,14 +38,35 @@ impl DbDriver {
     pub async fn query(
         &mut self,
         table_name: &str,
-        order_by: Option<String>,
+        order_by_clause: Option<String>,
         where_clause: Option<String>,
+        sort: &str,
         offset: usize,
         limit: usize,
     ) -> Result<QueryResult> {
         match self {
-            DbDriver::Postgres(d) => d.query(table_name, order_by, where_clause, offset, limit).await,
-            DbDriver::MySql(d) => d.query(table_name, order_by, where_clause, offset, limit).await,
+            DbDriver::Postgres(d) => {
+                d.query(
+                    table_name,
+                    order_by_clause,
+                    where_clause,
+                    sort,
+                    offset,
+                    limit,
+                )
+                .await
+            }
+            DbDriver::MySql(d) => {
+                d.query(
+                    table_name,
+                    order_by_clause,
+                    where_clause,
+                    sort,
+                    offset,
+                    limit,
+                )
+                .await
+            }
         }
     }
 
@@ -56,10 +77,10 @@ impl DbDriver {
         }
     }
 
-    pub async fn get_default_order_by(&self, table_name: &str) -> Result<Option<String>> {
+    pub async fn get_default_order_by(&self, table_name: &str, sort: &str) -> Result<Option<String>> {
         match self {
-            DbDriver::Postgres(d) => d.get_default_order_by(table_name).await,
-            DbDriver::MySql(d) => d.get_default_order_by(table_name).await,
+            DbDriver::Postgres(d) => d.get_default_order_by(table_name, sort).await,
+            DbDriver::MySql(d) => d.get_default_order_by(table_name, sort).await,
         }
     }
 

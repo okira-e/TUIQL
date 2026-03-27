@@ -19,7 +19,14 @@ use ratatui::widgets::Row;
 use ratatui::widgets::Table;
 use serde_json::Value;
 
-pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, area: Rect, focused: bool) {
+pub fn render_table(
+    model: &mut TableModel,
+    theme: &Theme,
+    frame: &mut Frame,
+    area: Rect,
+    focused: bool,
+    default_sort: &str,
+) {
     let container_border_style = if focused {
         Style::default().fg(theme.pane_focus)
     } else {
@@ -34,20 +41,28 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
 
     let page_info = if let Some(total_count) = model.total_count {
         let total_pages = (total_count as f64 / model.query_state.limit as f64).ceil();
-        format!("Page {}/{} - Rows {}", page, total_pages, model.results_row_count)
+        format!(
+            "Page {}/{} - Rows {}",
+            page, total_pages, model.results_row_count
+        )
     } else {
         format!("Page {} - Rows {}", page, model.results_row_count)
     };
 
     let title = model.table_name.clone().unwrap_or("Query Result".to_string());
 
+    let title_line = if !default_sort.is_empty() && !model.query_result.rows.is_empty() {
+        Line::from(vec![
+            Span::raw(title),
+            Span::styled(format!(": {}", default_sort), Style::default().fg(Color::DarkGray)),
+        ])
+    } else {
+        Line::from(title)
+    };
+
     let mut container_block = Block::default()
-        .title(title)
-        .title(
-            Line::from(page_info)
-                .style(theme.fg)
-                .alignment(Alignment::Center),
-        )
+        .title(title_line)
+        .title(Line::from(page_info).style(theme.fg).alignment(Alignment::Center))
         .border_style(container_border_style)
         .borders(Borders::ALL);
 
@@ -63,43 +78,62 @@ pub fn render_table(model: &mut TableModel, theme: &Theme, frame: &mut Frame, ar
     // Set the total count/pages of the table if it has been fetched.
     //
 
-    // Build left-aligned bottom title with active where/order-by clauses
-    let max_clause_len = (area.width as usize).saturating_sub(2) / 2;
-    let mut clauses: Vec<Span> = vec![];
+    // Build bottom title: WHERE on left half, separator at middle, ORDER on right half
+    let inner_width = (area.width as usize).saturating_sub(2);
+    let half_width = inner_width / 2;
+    let has_where = model.query_state.where_clause.is_some();
+    let has_order = model.query_state.order_by_clause.is_some();
 
-    if let Some(ref where_clause) = model.query_state.where_clause {
-        let label = "WHERE: ";
-        let max_val = max_clause_len.saturating_sub(label.len());
-        let value = if where_clause.len() > max_val {
-            format!("{}…", &where_clause[..max_val.saturating_sub(1)])
+    if has_where || has_order {
+        let mut spans: Vec<Span> = vec![];
+
+        // Left half: WHERE clause padded to half_width
+        let where_label = "WHERE: ";
+        let max_where_val = half_width.saturating_sub(where_label.len()).saturating_sub(1); // -1 for separator
+        let left_content_len;
+        if let Some(ref where_clause) = model.query_state.where_clause {
+            let value = if where_clause.len() > max_where_val {
+                format!("{}…", &where_clause[..max_where_val.saturating_sub(1)])
+            } else {
+                where_clause.clone()
+            };
+            left_content_len = where_label.len() + value.len();
+            spans.push(Span::styled(
+                where_label,
+                Style::default().fg(Color::DarkGray),
+            ));
+            spans.push(Span::styled(value, theme.fg));
         } else {
-            where_clause.clone()
-        };
-        clauses.push(Span::styled(label, Style::default().fg(Color::DarkGray)));
-        clauses.push(Span::styled(value, theme.fg));
-    }
-
-    if let Some(ref order_by) = model.query_state.order_by {
-        if !clauses.is_empty() {
-            clauses.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+            left_content_len = 0;
         }
-        let label = "ORDER: ";
-        let max_val = max_clause_len.saturating_sub(label.len());
-        let value = if order_by.len() > max_val {
-            format!("{}…", &order_by[..max_val.saturating_sub(1)])
-        } else {
-            order_by.clone()
-        };
-        clauses.push(Span::styled(label, Style::default().fg(Color::DarkGray)));
-        clauses.push(Span::styled(value, theme.fg));
-    }
 
-    if !clauses.is_empty() {
-        container_block = container_block.title_bottom(
-            Line::from(clauses).alignment(Alignment::Left),
-        );
-    }
+        if let Some(ref order_by) = model.query_state.order_by_clause {
+            // Pad with border character to reach the middle
+            let padding = half_width.saturating_sub(left_content_len);
+            if padding > 0 {
+                spans.push(Span::styled("─".repeat(padding), container_border_style));
+            }
 
+            // Separator
+            spans.push(Span::styled("│", Style::default().fg(Color::DarkGray)));
+
+            // Right half: ORDER clause
+            let order_label = " ORDER: ";
+            let max_order_val = half_width.saturating_sub(order_label.len());
+            let value = if order_by.len() > max_order_val {
+                format!("{}…", &order_by[..max_order_val.saturating_sub(1)])
+            } else {
+                order_by.clone()
+            };
+            spans.push(Span::styled(
+                order_label,
+                Style::default().fg(Color::DarkGray),
+            ));
+            spans.push(Span::styled(value, theme.fg));
+        }
+
+        container_block = container_block.title_bottom(Line::from(spans).alignment(Alignment::Left));
+    }
 
     frame.render_widget(&container_block, area);
 

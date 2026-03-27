@@ -79,12 +79,13 @@ impl MySqlDriver {
     pub async fn query(
         &mut self,
         table_name: &str,
-        order_by: Option<String>,
+        order_by_clause: Option<String>,
         where_clause: Option<String>,
+        sort: &str,
         offset: usize,
         limit: usize,
     ) -> Result<QueryResult> {
-        let order_by = order_by.or(self.get_default_order_by(table_name).await?);
+        let order_by = order_by_clause.or(self.get_default_order_by(table_name, sort).await?);
 
         let columns = self.get_columns(table_name).await?;
         let ident = quote_ident(table_name);
@@ -159,13 +160,17 @@ impl MySqlDriver {
         return Ok(count as usize);
     }
 
-    pub async fn get_default_order_by(&self, table_name: &str) -> Result<Option<String>> {
+    pub async fn get_default_order_by(&self, table_name: &str, sort: &str) -> Result<Option<String>> {
         let pk_cols = self.get_pk_columns(table_name).await?;
         if pk_cols.is_empty() {
             return Ok(None);
         } else {
-            let clause = pk_cols.iter().map(|c| quote_ident(c)).collect::<Vec<_>>().join(", ");
-            return Ok(Some(format!("{} ASC", clause)));
+            let clause = pk_cols
+                .iter()
+                .map(|c| quote_ident(c))
+                .collect::<Vec<_>>()
+                .join(&format!(" {}, ", sort));
+            return Ok(Some(format!("{} {}", clause, sort)));
         }
     }
 
