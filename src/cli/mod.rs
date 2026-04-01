@@ -104,12 +104,14 @@ async fn open_connection(args: args::OpenCmdArgs) -> Result<()> {
 }
 
 async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
+    let password = rpassword::prompt_password("Database password: ")?;
+
     drivers::ping_connection(
         args.r#type,
         &args.host,
         args.port,
         &args.user,
-        &args.pass,
+        &password,
         &args.database,
     )
     .await?;
@@ -119,7 +121,7 @@ async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
         kind: args.r#type,
         url: format!(
             "{}://{}:{}@{}:{}/{}",
-            args.r#type, args.user, args.pass, args.host, args.port, args.database
+            args.r#type, args.user, password, args.host, args.port, args.database
         ),
     };
 

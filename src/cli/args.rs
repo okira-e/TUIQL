@@ -41,9 +41,6 @@ pub struct SaveConnectionCmdArgs {
     /// The host of the database.
     #[arg(long)]
     pub host: String,
-    /// The password of the database user.
-    #[arg(long)]
-    pub pass: String,
     /// The user of the database.
     #[arg(long)]
     pub user: String,
