@@ -31,6 +31,12 @@ pub struct OpenCmdArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct RemoveConnectionCmdArgs {
+    /// The name of the connection to remove.
+    pub connection_name: String,
+}
+
+#[derive(Debug, Args)]
 pub struct SaveConnectionCmdArgs {
     /// The type of database: "postgres" | "mysql" | "mariadb" | "sqlite".
     #[arg(long)]

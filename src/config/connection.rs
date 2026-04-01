@@ -83,6 +83,34 @@ pub fn add_connection(conn: Connection) -> Result<()> {
     return Ok(());
 }
 
+pub fn remove_connection(name: &str) -> Result<()> {
+    let mut connections = load_connections()?;
+
+    let initial_len = connections.len();
+    connections.retain(|c| c.name != name);
+
+    if connections.len() == initial_len {
+        bail!("Connection \"{}\" not found", name);
+    }
+
+    let config_path = match get_config_dir_path_based_on_os()? {
+        Some(path) => path,
+        None => bail!("Unable to get config dir"),
+    };
+
+    let connections_file = match File::create(config_path.join("connections.json")) {
+        Ok(val) => val,
+        Err(err) => bail!("Failed to open connection file: {}", err),
+    };
+
+    match serde_json::to_writer_pretty(connections_file, &connections) {
+        Ok(_) => {}
+        Err(err) => bail!("Failed to write connection file: {}", err),
+    };
+
+    return Ok(());
+}
+
 fn connections_config_path(project: &str) -> Result<PathBuf> {
     let config_path = match get_config_dir_path_based_on_os()? {
         Some(path) => path,
