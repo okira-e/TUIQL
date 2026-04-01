@@ -1,3 +1,4 @@
+use crate::models::table_model::TEXT_CELL_WIDTH;
 use crate::models::table_model::TableModel;
 use crate::theme::Theme;
 use ratatui::Frame;
@@ -18,6 +19,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::Row;
 use ratatui::widgets::Table;
 use serde_json::Value;
+use uuid::Uuid;
 
 pub fn render_table(
     model: &mut TableModel,
@@ -54,7 +56,10 @@ pub fn render_table(
     let title_line = if !default_sort.is_empty() && !model.query_result.rows.is_empty() {
         Line::from(vec![
             Span::raw(title),
-            Span::styled(format!(": {}", default_sort), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(": {}", default_sort),
+                Style::default().fg(Color::DarkGray),
+            ),
         ])
     } else {
         Line::from(title)
@@ -165,7 +170,7 @@ pub fn render_table(
     for (row_index, row) in visible_rows.iter().enumerate() {
         let row_map = row.as_object().unwrap();
 
-        let mut values = vec![];
+        let mut cells = vec![];
         let row_style = if row_index % 2 == 0 {
             Style::default()
         } else {
@@ -178,17 +183,19 @@ pub fn render_table(
                 Value::Number(number) => {
                     Cell::from(format!(" {}", number.to_string())).style(row_style.fg(Color::Cyan))
                 }
-                Value::String(s) => Cell::from(format!(" {}", s.clone())).style(row_style.patch(theme.fg)),
+                Value::String(s) => {
+                    Cell::from(format!(" {}", truncate(&s, TEXT_CELL_WIDTH))).style(row_style.patch(theme.fg))
+                }
                 Value::Array(values) => {
                     Cell::from(format!("[{} items]", values.len())).style(row_style.fg(Color::Magenta))
                 }
                 Value::Object(map) => Cell::from(format!("{{{} keys}}", map.len())).style(row_style.fg(Color::Blue)),
             };
 
-            values.push(cell);
+            cells.push(cell);
         }
 
-        table_rows.push(Row::new(values));
+        table_rows.push(Row::new(cells));
     }
 
     let constraints = vec![Constraint::Max(40); visible_cols.len()];
@@ -225,5 +232,35 @@ pub fn render_table(
             Span::from(scrollbar_offset + &scrollbar).style(theme.fg),
             horizontal_scroll_bar_area,
         );
+    }
+}
+
+fn truncate(s: &str, len: usize) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let n = chars.len();
+
+    if n <= len {
+        return s.to_string();
+    }
+
+    if len <= 3 {
+        return ".".repeat(len);
+    }
+
+    let keep = len - 3;
+
+    if Uuid::parse_str(s).is_ok() {
+        // middle ellipsis for UUIDs
+        let front = (keep + 1) / 2;
+        let back = keep / 2;
+
+        let start: String = chars[..front].iter().collect();
+        let end: String = chars[n - back..].iter().collect();
+
+        format!("{start}…{end}")
+    } else {
+        // tail truncation for everything else
+        let start: String = chars[..keep].iter().collect();
+        format!("{start}…")
     }
 }

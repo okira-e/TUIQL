@@ -28,3 +28,4 @@ tracing = "0.1.41"
 tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.19", features = ["fmt", "env-filter"] }
 url = "2.5.4"
+uuid = "1.23.0"

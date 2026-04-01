@@ -6,6 +6,8 @@ use ratatui::layout::Constraint;
 use ratatui::widgets::TableState;
 use serde_json::Value;
 
+pub const TEXT_CELL_WIDTH: usize = 30;
+
 #[derive(Debug)]
 pub struct TableModel {
     pub table_name: Option<String>,
@@ -68,7 +70,7 @@ impl TableModel {
             } else if col.data_type == "text" {
                 35
             } else {
-                30
+                TEXT_CELL_WIDTH as u16
             };
 
             if width_so_far + w < width {
