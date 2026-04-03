@@ -2,6 +2,7 @@ use crate::drivers::ColumnMetadata;
 use crate::drivers::QueryResult;
 use color_eyre::Result;
 use dashmap::DashMap;
+use serde_json::json;
 use sqlx::Row;
 use sqlx::mysql::MySqlRow;
 
@@ -103,10 +104,20 @@ impl MySqlDriver {
         let json_args: Vec<String> = columns
             .iter()
             .map(|c| {
+                let col_ref = quote_ident(&c.name);
+                // Binary columns can contain non-UTF-8 data which causes JSON_OBJECT
+                // to fail with a Utf8Error. Replace their values with a placeholder,
+                // preserving NULLs so they still render correctly.
+                let value_expr = match c.data_type.as_str() {
+                    "blob" | "mediumblob" | "longblob" | "tinyblob" | "binary" | "varbinary" => {
+                        format!("IF(t.{} IS NULL, NULL, '[BINARY]')", col_ref)
+                    }
+                    _ => format!("t.{}", col_ref),
+                };
                 format!(
-                    "'{}', t.{}",
+                    "'{}', {}",
                     c.name.replace('\'', "''"),
-                    quote_ident(&c.name)
+                    value_expr
                 )
             })
             .collect();

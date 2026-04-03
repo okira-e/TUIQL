@@ -115,12 +115,26 @@ impl PostgresDriver {
             Some(clause) => format!(" ORDER BY {}", clause),
         };
 
+        // Binary columns (bytea) can't be serialized to JSON by to_jsonb().
+        // Replace their values with a placeholder, preserving NULLs so they
+        // still render correctly.
+        let select_cols: Vec<String> = columns
+            .iter()
+            .map(|c| {
+                let col = utils::quote_ident(&c.name);
+                match c.data_type.as_str() {
+                    "bytea" => format!("CASE WHEN {} IS NULL THEN NULL ELSE '[BINARY]' END AS {}", col, col),
+                    _ => col,
+                }
+            })
+            .collect();
+
         let sql = format!(
             r#"
             SELECT
                 to_jsonb(t) AS row
             FROM (
-                SELECT *
+                SELECT {columns}
                 FROM {table}
                 {where_sql}
                 {order_sql}
@@ -128,6 +142,7 @@ impl PostgresDriver {
                 OFFSET $2
             ) AS t;
         "#,
+            columns = select_cols.join(", "),
             table = ident,
             where_sql = where_sql,
             order_sql = order_sql,

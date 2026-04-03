@@ -94,6 +94,11 @@ impl App {
         let theme = Theme::catppuccin(Flavor::Mocha);
 
         let table_model = TableModel::new(&settings);
+        let project_name = if let Some(ref config) = config {
+            Some(config.name.clone())
+        } else {
+            None
+        };
 
         return Self {
             settings: settings,
@@ -108,7 +113,7 @@ impl App {
             right_view: RightView::ResultsTable,
             widgets_chunks: WidgetsChunks::default(),
             table_model: table_model,
-            explorer_model: ExplorerModel::default(),
+            explorer_model: ExplorerModel::new(project_name),
             statusline_model: StatusLineModel::default(),
             json_view_model: JsonViewModel::default(),
             area: Rect::default(),

@@ -52,6 +52,11 @@ pub fn render_explorer(model: &mut ExplorerModel, theme: &Theme, frame: &mut Fra
         .title(Line::from("t").style(table_tab_color).alignment(Alignment::Right))
         .title(Line::from("v").style(view_tab_color).alignment(Alignment::Right))
         .title(Line::from("m").style(mview_tab_color).alignment(Alignment::Right))
+        .title_bottom(
+            Line::from(model.project_name.clone().unwrap_or(String::new()))
+                .style(mview_tab_color)
+                .alignment(Alignment::Right),
+        )
         .border_style(border_style)
         .borders(Borders::ALL);
 

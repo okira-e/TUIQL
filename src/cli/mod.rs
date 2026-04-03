@@ -99,7 +99,7 @@ async fn open_connection(args: args::OpenCmdArgs) -> Result<()> {
         Some(c) => c,
         None => {
             bail!(
-                "The connection you provided doesn't exist. See \"{} list-connections\" for a list of connections.",
+                "The connection you provided doesn't exist. See \"{} ls\" for a list of connections.",
                 env!("CARGO_PKG_NAME")
             );
         }
