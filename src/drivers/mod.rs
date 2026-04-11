@@ -28,10 +28,10 @@ impl DbDriver {
         }
     }
 
-    pub async fn get_mateialized_views(&self) -> Result<Vec<String>> {
+    pub async fn get_materialized_views(&self) -> Result<Vec<String>> {
         match self {
-            DbDriver::Postgres(d) => d.get_mateialized_views().await,
-            DbDriver::MySql(d) => d.get_mateialized_views().await,
+            DbDriver::Postgres(d) => d.get_materialized_views().await,
+            DbDriver::MySql(d) => d.get_materialized_views().await,
         }
     }
 

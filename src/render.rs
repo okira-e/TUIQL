@@ -2,6 +2,7 @@ use crate::app::App;
 use crate::app::RightView;
 use crate::app::View;
 use crate::views::explorer_view::render_explorer;
+use crate::views::help_view::render_help_view;
 use crate::views::json_view::render_json_view;
 use crate::views::statusline_view::render_statusline;
 use crate::views::table_view::render_table;
@@ -11,7 +12,10 @@ use ratatui::widgets::Block;
 
 impl App {
     pub fn render(&mut self, frame: &mut Frame) {
-        let root = frame.area();
+        // This is here to make sure that layout is as fresh as possible before drawing since we take the
+        // definitive frame in this function. Otherwise, a race condition may exist in app.run.
+        self.calculate_widgets_chunks(frame.area().width, frame.area().height);
+
         // Set app-wide background
         let bg = if self.settings.transparent_background {
             Block::default()
@@ -19,7 +23,7 @@ impl App {
             Block::default().style(Style::default().bg(self.theme.bg))
         };
 
-        frame.render_widget(bg, root);
+        frame.render_widget(bg, frame.area());
         let focused_view = self.get_focused_view();
 
         // Render left pane
@@ -50,6 +54,15 @@ impl App {
                     self.widgets_chunks.table_chunk,
                     focused_view == View::ResultsTable,
                     &self.settings.default_sort,
+                );
+            }
+            RightView::Help => {
+                render_help_view(
+                    &self.help_view_model,
+                    &self.theme,
+                    frame,
+                    self.widgets_chunks.help_view_chunk,
+                    focused_view == View::Help,
                 );
             }
         }

@@ -34,7 +34,7 @@ pub fn render_json_view(model: &JsonViewModel, theme: &Theme, frame: &mut Frame,
                 .border_style(if focused { theme.pane_focus } else { Color::default() })
                 .border_type(BorderType::Double)
                 .borders(Borders::ALL)
-                .style(Style::default().bg(theme.bg).fg(theme.fg));
+                .style(Style::default().fg(theme.fg));
 
             let text = Text::from(lines);
 

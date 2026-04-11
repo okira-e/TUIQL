@@ -65,11 +65,12 @@ tuiql ls
 
 ### Table
 
-| Key | Action                 |
-| --- | ---------------------- |
-| w   | Add a WHERE clause     |
-| o   | Add an ORDER BY clause |
-| r   | Refresh query result   |
+| Key | Action                            |
+| --- | --------------------------------- |
+| w   | Add a WHERE clause                |
+| o   | Add an ORDER BY clause            |
+| r   | Refresh query result              |
+| y   | Copy highlighted row to clipboard |
 
 ### Command Mode
 
@@ -77,15 +78,17 @@ Press `:` to enter command mode.
 
 | Command           | Shorthand | Action                                                       |
 | ----------------- | --------- | ------------------------------------------------------------ |
+| help              | h         | Open the help view                                           |
 | quit              | q         | Quit the application                                         |
 | count             | c         | Count fetched rows                                           |
 | total-count       | tc        | Count total rows in the selected table regardless of filters |
 | goto page 5       | g p       | Jump to a specific page                                      |
+| goto table_name   | g         | Jump to a table by name                                      |
 | limit 1000\|1k    | l         | Set rows per page                                            |
 | refresh           | r         | Re-fetch data with current filters                           |
 | order-by col desc | ob        | Add ORDER BY (no args to reset)                              |
 | where col = 'val' | w         | Add WHERE clause (no args to reset)                          |
-| set key value     | s         | Change a setting at runtime                                  |
+| set key value     |           | Change a setting at runtime                                  |
 
 ## Features
 
@@ -117,4 +120,4 @@ This project is licensed under the MIT license - see the [LICENSE](LICENSE) file
 Testing this app is done with the following free sample databases:
 
 - Postgres: [pagila](https://github.com/devrimgunduz/pagila)
-- Mysql: [sakila](https://dev.mysql.com/doc/sakila/en/sakila-installation.html)
+- Mysql/Mariadb: [sakila](https://dev.mysql.com/doc/sakila/en/sakila-installation.html)

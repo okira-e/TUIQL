@@ -10,6 +10,7 @@ use crate::drivers::DbDriver;
 use crate::models::explorer_model::ExplorerItem;
 use crate::models::explorer_model::ExplorerItemKind;
 use crate::models::explorer_model::ExplorerModel;
+use crate::models::help_view_model::HelpViewModel;
 use crate::models::json_view_model::JsonViewModel;
 use crate::models::statusline_model::MsgKind;
 use crate::models::statusline_model::MsgLifetime;
@@ -38,6 +39,7 @@ pub enum View {
     ResultsTable,
     StatusLine,
     JsonView,
+    Help,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -48,8 +50,10 @@ pub enum Pane {
 }
 
 pub enum RightView {
+    /// Always open with an empty data message.
     ResultsTable,
     JsonView,
+    Help,
 }
 
 #[derive(Default)]
@@ -58,6 +62,7 @@ pub struct WidgetsChunks {
     pub table_chunk: Rect,
     pub json_view_chunk: Rect,
     pub statusline_chunk: Rect,
+    pub help_view_chunk: Rect,
 }
 
 pub struct App {
@@ -72,6 +77,7 @@ pub struct App {
     pub explorer_model: ExplorerModel,
     pub statusline_model: StatusLineModel,
     pub json_view_model: JsonViewModel,
+    pub help_view_model: HelpViewModel,
     pub settings: Settings,
     /// None if the user connected directly without saving the connection.
     pub config: Option<ProjectConfig>,
@@ -117,6 +123,7 @@ impl App {
             statusline_model: StatusLineModel::default(),
             json_view_model: JsonViewModel::default(),
             area: Rect::default(),
+            help_view_model: HelpViewModel::default(),
             is_loading: false,
             prev_focused_pane: Pane::Left,
         };
@@ -133,7 +140,7 @@ impl App {
         let driver = self.db_driver.lock().await;
         let tables: Vec<String> = driver.get_tables().await?;
         let views: Vec<String> = driver.get_views().await?;
-        let materialized: Vec<String> = driver.get_mateialized_views().await?;
+        let materialized: Vec<String> = driver.get_materialized_views().await?;
         drop(driver); // unlock the mutex
 
         let tables: Vec<ExplorerItem> = tables
@@ -173,7 +180,7 @@ impl App {
         self.running = true;
         let size = terminal.size()?;
         self.area = Rect::new(0, 0, size.width, size.height);
-        self.calculate_widgets_chunks();
+        self.calculate_widgets_chunks(self.area.width, self.area.height);
 
         while self.running {
             self.handle_events().await?;
@@ -190,11 +197,11 @@ impl App {
         self.running = false;
     }
 
-    pub fn calculate_widgets_chunks(&mut self) {
+    pub fn calculate_widgets_chunks(&mut self, width: u16, height: u16) {
         let app_statusline_split = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(1), Constraint::Max(1)])
-            .split(self.area);
+            .split(Rect { x: 0, y: 0, width, height });
 
         let explorer_table_split = Layout::default()
             .direction(Direction::Horizontal)
@@ -206,6 +213,7 @@ impl App {
         self.widgets_chunks.explorer_chunk = explorer_split;
         self.widgets_chunks.table_chunk = table_split;
         self.widgets_chunks.json_view_chunk = table_split;
+        self.widgets_chunks.help_view_chunk = table_split;
         self.widgets_chunks.statusline_chunk = app_statusline_split[1];
     }
 
@@ -225,6 +233,7 @@ impl App {
             Pane::Right => match self.right_view {
                 RightView::ResultsTable => View::ResultsTable,
                 RightView::JsonView => View::JsonView,
+                RightView::Help => View::Help,
             },
             Pane::StatusLine => View::StatusLine,
         };
@@ -241,6 +250,7 @@ impl App {
             Cmd::Limit(limit) => Ok(Action::Cmd(AppCmd::Limit(limit))),
             Cmd::RefreshTable => Ok(Action::Db(DbAction::QueryTable)),
             Cmd::Set(key, value) => Ok(Action::Cmd(AppCmd::SettingChange(key, value))),
+            Cmd::OpenHelp => Ok(Action::App(AppAction::OpenHelp)),
         };
     }
 

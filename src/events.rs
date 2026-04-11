@@ -3,6 +3,7 @@ use crate::actions::AppAction;
 use crate::actions::CmdLineAction;
 use crate::actions::DbAction;
 use crate::actions::ExplorerAction;
+use crate::actions::HelpViewAction;
 use crate::actions::JsonViewAction;
 use crate::actions::ResultsTableAction;
 use crate::app::App;
@@ -145,7 +146,6 @@ impl App {
 
                 _ => {}
             },
-
             View::Explorer => match (key.modifiers, key.code) {
                 (_, KeyCode::Char('k') | KeyCode::Up) | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
                     self.update(Action::Explorer(ExplorerAction::MoveUp));
@@ -186,7 +186,6 @@ impl App {
 
                 _ => {}
             },
-
             View::StatusLine => match (key.modifiers, key.code) {
                 (_, KeyCode::Up) | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
                     self.update(Action::CmdLine(CmdLineAction::TogglePrevCommand));
@@ -252,7 +251,6 @@ impl App {
 
                 _ => {}
             },
-
             View::JsonView => match (key.modifiers, key.code) {
                 (_, KeyCode::Char('g')) => {
                     self.update(Action::JsonView(JsonViewAction::GoToFirst));
@@ -281,6 +279,39 @@ impl App {
 
                 _ => {}
             },
+            View::Help => match (key.modifiers, key.code) {
+                (_, KeyCode::Char('k') | KeyCode::Up) | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
+                    self.update(Action::HelpView(HelpViewAction::MoveUp));
+                    return;
+                }
+
+                (_, KeyCode::Char('j') | KeyCode::Down) | (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
+                    self.update(Action::HelpView(HelpViewAction::MoveDown));
+                    return;
+                }
+
+                (_, KeyCode::Char('g')) => {
+                    self.update(Action::HelpView(HelpViewAction::GoToFirst));
+                    return;
+                }
+
+                (_, KeyCode::Enter) => {
+                    self.update(Action::HelpView(HelpViewAction::ActivateAction));
+                    return;
+                }
+
+                (_, KeyCode::Char('G')) => {
+                    self.update(Action::HelpView(HelpViewAction::GoToLast));
+                    return;
+                }
+
+                (_, KeyCode::Esc) => {
+                    self.update(Action::App(AppAction::CloseHelp));
+                    return;
+                }
+
+                _ => {}
+            },
         }
 
         // Global keymaps
@@ -295,6 +326,10 @@ impl App {
             }
             (_, KeyCode::Char(':')) => {
                 self.update(Action::App(AppAction::SetCommandMode));
+                return;
+            }
+            (_, KeyCode::Char('?')) => {
+                self.update(Action::App(AppAction::OpenHelp));
                 return;
             }
             _ => {}

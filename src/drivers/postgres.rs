@@ -73,7 +73,7 @@ impl PostgresDriver {
         return Ok(views);
     }
 
-    pub async fn get_mateialized_views(&self) -> Result<Vec<String>> {
+    pub async fn get_materialized_views(&self) -> Result<Vec<String>> {
         let rows: Vec<PgRow> = sqlx::query(
             "SELECT matviewname AS table_name
             FROM pg_matviews
@@ -123,7 +123,10 @@ impl PostgresDriver {
             .map(|c| {
                 let col = utils::quote_ident(&c.name);
                 match c.data_type.as_str() {
-                    "bytea" => format!("CASE WHEN {} IS NULL THEN NULL ELSE '[BINARY]' END AS {}", col, col),
+                    "bytea" => format!(
+                        "CASE WHEN {} IS NULL THEN NULL ELSE '[BINARY]' END AS {}",
+                        col, col
+                    ),
                     _ => col,
                 }
             })

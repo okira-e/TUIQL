@@ -13,8 +13,18 @@ pub enum Action {
     ResultsTable(ResultsTableAction),
     Db(DbAction),
     JsonView(JsonViewAction),
+    HelpView(HelpViewAction),
     CmdLine(CmdLineAction),
     Cmd(AppCmd),
+}
+
+#[derive(Debug)]
+pub enum HelpViewAction {
+    MoveUp,
+    MoveDown,
+    GoToFirst,
+    GoToLast,
+    ActivateAction,
 }
 
 #[derive(Debug)]
@@ -33,6 +43,8 @@ pub enum AppAction {
     StopLoading,
     /// Updates the where and the order_by in the query state respectively
     UpdateQueryState(Option<String>, Option<String>),
+    OpenHelp,
+    CloseHelp,
 }
 
 #[derive(Debug)]

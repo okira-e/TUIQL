@@ -4,6 +4,7 @@ use crate::actions::AppCmd;
 use crate::actions::CmdLineAction;
 use crate::actions::DbAction;
 use crate::actions::ExplorerAction;
+use crate::actions::HelpViewAction;
 use crate::actions::JsonViewAction;
 use crate::actions::ResultsTableAction;
 use crate::app::App;
@@ -35,6 +36,7 @@ impl App {
             Action::Explorer(action) => self.update_explorer(action),
             Action::ResultsTable(action) => self.update_results_table(action),
             Action::JsonView(action) => self.update_json_view(action),
+            Action::HelpView(action) => self.update_help_view(action),
             Action::CmdLine(action) => self.update_cmdline(action),
             Action::Cmd(action) => self.update_cmd(action),
         };
@@ -73,7 +75,7 @@ impl App {
             AppAction::Resize(w, h) => {
                 self.area.width = w;
                 self.area.height = h;
-                self.calculate_widgets_chunks();
+                self.calculate_widgets_chunks(w, h);
                 self.table_model.reset_ui(Some(0));
             }
             AppAction::ViewSelectedRowAsJson => {
@@ -106,6 +108,22 @@ impl App {
             AppAction::UpdateQueryState(where_clause, order_by) => {
                 self.table_model.query_state.where_clause = where_clause.clone();
                 self.table_model.query_state.order_by_clause = order_by.clone();
+            }
+            AppAction::OpenHelp => {
+                self.right_view = RightView::Help;
+                self.focus_pane(Pane::Right);
+            }
+            AppAction::CloseHelp => {
+                self.right_view = RightView::ResultsTable;
+
+                // Prevent sending focus to the statusline if we opened the help from the command
+                let pane_to_focus = if self.prev_focused_pane == Pane::StatusLine {
+                    Pane::Left
+                } else {
+                    self.prev_focused_pane
+                };
+
+                self.focus_pane(pane_to_focus);
             }
         }
     }
@@ -1006,5 +1024,33 @@ impl App {
                 self.json_view_model.scroll_y = 0;
             }
         }
+    }
+
+    fn update_help_view(&mut self, action: HelpViewAction) {
+        let (_, selectable) = crate::views::help_view::get_help_rows();
+        let total = selectable.len();
+        if total == 0 {
+            return;
+        }
+
+        match action {
+            HelpViewAction::MoveUp => {
+                self.help_view_model.cursor = self.help_view_model.cursor.saturating_sub(1);
+            }
+            HelpViewAction::MoveDown => {
+                if self.help_view_model.cursor + 1 < total {
+                    self.help_view_model.cursor += 1;
+                }
+            }
+            HelpViewAction::GoToFirst => {
+                self.help_view_model.cursor = 0;
+            }
+            HelpViewAction::GoToLast => {
+                self.help_view_model.cursor = total - 1;
+            }
+            HelpViewAction::ActivateAction => {}
+        }
+
+        self.help_view_model.cursor = self.help_view_model.cursor.min(total - 1);
     }
 }

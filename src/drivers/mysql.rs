@@ -2,7 +2,6 @@ use crate::drivers::ColumnMetadata;
 use crate::drivers::QueryResult;
 use color_eyre::Result;
 use dashmap::DashMap;
-use serde_json::json;
 use sqlx::Row;
 use sqlx::mysql::MySqlRow;
 
@@ -72,7 +71,7 @@ impl MySqlDriver {
         return Ok(views);
     }
 
-    pub async fn get_mateialized_views(&self) -> Result<Vec<String>> {
+    pub async fn get_materialized_views(&self) -> Result<Vec<String>> {
         // MySQL does not support materialized views.
         return Ok(Vec::new());
     }
@@ -114,11 +113,7 @@ impl MySqlDriver {
                     }
                     _ => format!("t.{}", col_ref),
                 };
-                format!(
-                    "'{}', {}",
-                    c.name.replace('\'', "''"),
-                    value_expr
-                )
+                format!("'{}', {}", c.name.replace('\'', "''"), value_expr)
             })
             .collect();
         let json_object_expr = format!("JSON_OBJECT({})", json_args.join(", "));

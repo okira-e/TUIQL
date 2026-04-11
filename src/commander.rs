@@ -16,6 +16,7 @@ pub enum Cmd {
     Limit(usize),
     RefreshTable,
     Set(String, Option<String>),
+    OpenHelp,
 }
 
 #[derive(Debug, PartialEq)]
@@ -39,6 +40,7 @@ pub fn parse_cmd(input: &str) -> Result<Cmd> {
             "l" | "limit" => parse_limit_cmd(&mut iter),
             "r" | "refresh" => Ok(Cmd::RefreshTable),
             "set" => parse_set_cmd(&mut iter),
+            "help" | "h" => Ok(Cmd::OpenHelp),
             _ => bail!("Unknown command: {}", cmd),
         },
         None => bail!("Empty command"),

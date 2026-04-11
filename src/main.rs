@@ -1,6 +1,5 @@
 mod actions;
 mod app;
-mod settings;
 mod cli;
 mod commander;
 mod config;
@@ -9,6 +8,7 @@ mod events;
 mod logging;
 mod models;
 mod render;
+mod settings;
 mod theme;
 mod update;
 mod utils;
