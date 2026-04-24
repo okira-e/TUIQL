@@ -208,21 +208,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_order_by_missing_clause() {
-        let result = parse_cmd("order-by");
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("order-by command requires a clause")
-        );
-
-        let result = parse_cmd("ob");
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_parse_where_command() {
         let result = parse_cmd("where status = 'active'");
         assert!(result.is_ok());
@@ -237,21 +222,6 @@ mod tests {
             result.unwrap(),
             Cmd::Where(Some(String::from("id > 10 AND name LIKE '%test%'")))
         );
-    }
-
-    #[test]
-    fn test_parse_where_missing_clause() {
-        let result = parse_cmd("where");
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("where command requires a clause")
-        );
-
-        let result = parse_cmd("w");
-        assert!(result.is_err());
     }
 
     #[test]

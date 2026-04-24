@@ -93,30 +93,6 @@ impl DbDriver {
             DbDriver::SQLite(d) => d.query_count(table_name, where_clause).await,
         }
     }
-
-    pub async fn get_default_order_by(&self, table_name: &str, sort: &str) -> Result<Option<String>> {
-        match self {
-            DbDriver::Postgres(d) => d.get_default_order_by(table_name, sort).await,
-            DbDriver::MySql(d) => d.get_default_order_by(table_name, sort).await,
-            DbDriver::SQLite(d) => d.get_default_order_by(table_name, sort).await,
-        }
-    }
-
-    pub async fn get_pk_columns(&self, table_name: &str) -> Result<Vec<String>> {
-        match self {
-            DbDriver::Postgres(d) => d.get_pk_columns(table_name).await,
-            DbDriver::MySql(d) => d.get_pk_columns(table_name).await,
-            DbDriver::SQLite(d) => d.get_pk_columns(table_name).await,
-        }
-    }
-
-    pub async fn get_columns(&self, table_name: &str) -> Result<Vec<ColumnMetadata>> {
-        match self {
-            DbDriver::Postgres(d) => d.get_columns(table_name).await,
-            DbDriver::MySql(d) => d.get_columns(table_name).await,
-            DbDriver::SQLite(d) => d.get_columns(table_name).await,
-        }
-    }
 }
 
 pub async fn new_connection(kind: DbKind, url: &str) -> Result<DbDriver> {
@@ -135,15 +111,15 @@ pub async fn ping_connection(
     password: &str,
     db_name: &str,
 ) -> Result<()> {
-    match kind {
+    return match kind {
         DbKind::MySQL | DbKind::Mariadb => MySqlDriver::ping(host, port, user, password, db_name).await,
         DbKind::Postgres => PostgresDriver::ping(host, port, user, password, db_name).await,
         DbKind::SQLite => unreachable!("use ping_sqlite_connection for SQLite"),
-    }
+    };
 }
 
 pub async fn ping_sqlite_connection(path: &str) -> Result<()> {
-    SqliteDriver::ping(path).await
+    return SqliteDriver::ping(path).await;
 }
 
 #[derive(Debug, Default, Clone)]
