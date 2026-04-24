@@ -16,12 +16,17 @@ pub struct AppArgs {
 
 #[derive(Debug, Args)]
 pub struct ConnectCmdArgs {
-    /// If provided along with a url, opens the connection directly.
+    /// The type of database: "postgres" | "mysql" | "mariadb" | "sqlite".
     #[arg(long)]
     pub r#type: drivers::kinds::DbKind,
 
+    /// Connection URL (required for postgres, mysql, mariadb).
     #[arg(long)]
-    pub url: String,
+    pub url: Option<String>,
+
+    /// Path to the SQLite database file (required for sqlite).
+    #[arg(long)]
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -41,19 +46,22 @@ pub struct SaveConnectionCmdArgs {
     /// The type of database: "postgres" | "mysql" | "mariadb" | "sqlite".
     #[arg(long)]
     pub r#type: drivers::kinds::DbKind,
-    /// The name of the connection to open.
+    /// The name of the connection.
     #[arg(long)]
     pub name: String,
-    /// The host of the database.
+    /// The host of the database (required for postgres, mysql, mariadb).
     #[arg(long)]
-    pub host: String,
-    /// The user of the database.
+    pub host: Option<String>,
+    /// The user of the database (required for postgres, mysql, mariadb).
     #[arg(long)]
-    pub user: String,
-    /// The port of the database.
+    pub user: Option<String>,
+    /// The port of the database (required for postgres, mysql, mariadb).
     #[arg(long)]
-    pub port: u16,
-    /// The database name.
+    pub port: Option<u16>,
+    /// The database name (required for postgres, mysql, mariadb).
     #[arg(long)]
-    pub database: String,
+    pub database: Option<String>,
+    /// Path to the SQLite database file (required for sqlite).
+    #[arg(long)]
+    pub path: Option<String>,
 }

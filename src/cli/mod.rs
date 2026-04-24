@@ -88,7 +88,28 @@ async fn run_app(db_driver: DbDriver, project_name: Option<&str>) -> Result<()> 
 }
 
 async fn connect_directly(args: args::ConnectCmdArgs) -> Result<()> {
-    let db_driver = drivers::new_connection(args.r#type, &args.url).await?;
+    let url = match args.r#type {
+        drivers::kinds::DbKind::SQLite => {
+            let path = args.path.ok_or_else(|| {
+                color_eyre::eyre::eyre!(
+                    "Missing --path for sqlite connection.\n\nUsage for sqlite:\n  {} connect --type sqlite --path <PATH_TO_DB_FILE>",
+                    env!("CARGO_PKG_NAME")
+                )
+            })?;
+            format!("sqlite:{}", path)
+        }
+        _ => args.url.ok_or_else(|| {
+            color_eyre::eyre::eyre!(
+                "Missing --url for {} connection.\n\nUsage for {}:\n  {} connect --type {} --url <CONNECTION_URL>",
+                args.r#type,
+                args.r#type,
+                env!("CARGO_PKG_NAME"),
+                args.r#type
+            )
+        })?,
+    };
+
+    let db_driver = drivers::new_connection(args.r#type, &url).await?;
     return run_app(db_driver, None).await;
 }
 
@@ -110,25 +131,63 @@ async fn open_connection(args: args::OpenCmdArgs) -> Result<()> {
 }
 
 async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
-    let password = rpassword::prompt_password("Database password: ")?;
+    let conn = match args.r#type {
+        drivers::kinds::DbKind::SQLite => {
+            let path = args.path.ok_or_else(|| {
+                color_eyre::eyre::eyre!(
+                    "Missing --path for sqlite connection.\n\nUsage for sqlite:\n  {} add --type sqlite --name <NAME> --path <PATH_TO_DB_FILE>",
+                    env!("CARGO_PKG_NAME")
+                )
+            })?;
 
-    drivers::ping_connection(
-        args.r#type,
-        &args.host,
-        args.port,
-        &args.user,
-        &password,
-        &args.database,
-    )
-    .await?;
+            drivers::ping_sqlite_connection(&path).await?;
 
-    let conn = Connection {
-        name: args.name,
-        kind: args.r#type,
-        url: format!(
-            "{}://{}:{}@{}:{}/{}",
-            args.r#type, args.user, password, args.host, args.port, args.database
-        ),
+            Connection {
+                name: args.name,
+                kind: args.r#type,
+                url: format!("sqlite:{}", path),
+            }
+        }
+        _ => {
+            let missing: Vec<&str> = [
+                args.host.is_none().then_some("--host"),
+                args.user.is_none().then_some("--user"),
+                args.port.is_none().then_some("--port"),
+                args.database.is_none().then_some("--database"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+
+            if !missing.is_empty() {
+                bail!(
+                    "Missing required options for {} connection: {}\n\nUsage for {}:\n  {} add --type {} --name <NAME> --host <HOST> --port <PORT> --user <USER> --database <DATABASE>",
+                    args.r#type,
+                    missing.join(", "),
+                    args.r#type,
+                    env!("CARGO_PKG_NAME"),
+                    args.r#type
+                );
+            }
+
+            let host = args.host.unwrap();
+            let user = args.user.unwrap();
+            let port = args.port.unwrap();
+            let database = args.database.unwrap();
+
+            let password = rpassword::prompt_password("Database password: ")?;
+
+            drivers::ping_connection(args.r#type, &host, port, &user, &password, &database).await?;
+
+            Connection {
+                name: args.name,
+                kind: args.r#type,
+                url: format!(
+                    "{}://{}:{}@{}:{}/{}",
+                    args.r#type, user, password, host, port, database
+                ),
+            }
+        }
     };
 
     add_connection(conn)?;
@@ -166,6 +225,19 @@ fn list_connections() -> Result<()> {
     let extended_connections = connections
         .iter()
         .map(|connection| {
+            if connection.url.starts_with("sqlite:") {
+                let path = connection.url.trim_start_matches("sqlite:");
+                return ExtendedDatabaseConnection {
+                    name: connection.name.clone(),
+                    scheme: "sqlite".to_string(),
+                    user: String::new(),
+                    password: String::new(),
+                    host: path.to_string(),
+                    port: String::new(),
+                    db_name: String::new(),
+                };
+            }
+
             let url = Url::parse(&connection.url).unwrap();
 
             let scheme = url.scheme().to_string();

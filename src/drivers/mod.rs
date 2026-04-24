@@ -1,16 +1,18 @@
 pub mod kinds;
 pub mod mysql;
-// pub mod sqlite;
 pub mod postgres;
+pub mod sqlite;
 
 use crate::drivers::kinds::DbKind;
 use crate::drivers::mysql::MySqlDriver;
 use crate::drivers::postgres::PostgresDriver;
+use crate::drivers::sqlite::SqliteDriver;
 use color_eyre::Result;
 
 pub enum DbDriver {
     Postgres(PostgresDriver),
     MySql(MySqlDriver),
+    SQLite(SqliteDriver),
 }
 
 impl DbDriver {
@@ -18,6 +20,7 @@ impl DbDriver {
         match self {
             DbDriver::Postgres(d) => d.get_tables().await,
             DbDriver::MySql(d) => d.get_tables().await,
+            DbDriver::SQLite(d) => d.get_tables().await,
         }
     }
 
@@ -25,6 +28,7 @@ impl DbDriver {
         match self {
             DbDriver::Postgres(d) => d.get_views().await,
             DbDriver::MySql(d) => d.get_views().await,
+            DbDriver::SQLite(d) => d.get_views().await,
         }
     }
 
@@ -32,6 +36,7 @@ impl DbDriver {
         match self {
             DbDriver::Postgres(d) => d.get_materialized_views().await,
             DbDriver::MySql(d) => d.get_materialized_views().await,
+            DbDriver::SQLite(d) => d.get_materialized_views().await,
         }
     }
 
@@ -67,6 +72,17 @@ impl DbDriver {
                 )
                 .await
             }
+            DbDriver::SQLite(d) => {
+                d.query(
+                    table_name,
+                    order_by_clause,
+                    where_clause,
+                    sort,
+                    offset,
+                    limit,
+                )
+                .await
+            }
         }
     }
 
@@ -74,6 +90,7 @@ impl DbDriver {
         match self {
             DbDriver::Postgres(d) => d.query_count(table_name, where_clause).await,
             DbDriver::MySql(d) => d.query_count(table_name, where_clause).await,
+            DbDriver::SQLite(d) => d.query_count(table_name, where_clause).await,
         }
     }
 
@@ -81,6 +98,7 @@ impl DbDriver {
         match self {
             DbDriver::Postgres(d) => d.get_default_order_by(table_name, sort).await,
             DbDriver::MySql(d) => d.get_default_order_by(table_name, sort).await,
+            DbDriver::SQLite(d) => d.get_default_order_by(table_name, sort).await,
         }
     }
 
@@ -88,6 +106,7 @@ impl DbDriver {
         match self {
             DbDriver::Postgres(d) => d.get_pk_columns(table_name).await,
             DbDriver::MySql(d) => d.get_pk_columns(table_name).await,
+            DbDriver::SQLite(d) => d.get_pk_columns(table_name).await,
         }
     }
 
@@ -95,6 +114,7 @@ impl DbDriver {
         match self {
             DbDriver::Postgres(d) => d.get_columns(table_name).await,
             DbDriver::MySql(d) => d.get_columns(table_name).await,
+            DbDriver::SQLite(d) => d.get_columns(table_name).await,
         }
     }
 }
@@ -103,7 +123,7 @@ pub async fn new_connection(kind: DbKind, url: &str) -> Result<DbDriver> {
     return match kind {
         DbKind::MySQL | DbKind::Mariadb => Ok(DbDriver::MySql(MySqlDriver::new_pool(url).await?)),
         DbKind::Postgres => Ok(DbDriver::Postgres(PostgresDriver::new_pool(url).await?)),
-        DbKind::SQLite => todo!(),
+        DbKind::SQLite => Ok(DbDriver::SQLite(SqliteDriver::new_pool(url).await?)),
     };
 }
 
@@ -118,8 +138,12 @@ pub async fn ping_connection(
     match kind {
         DbKind::MySQL | DbKind::Mariadb => MySqlDriver::ping(host, port, user, password, db_name).await,
         DbKind::Postgres => PostgresDriver::ping(host, port, user, password, db_name).await,
-        DbKind::SQLite => todo!(),
+        DbKind::SQLite => unreachable!("use ping_sqlite_connection for SQLite"),
     }
+}
+
+pub async fn ping_sqlite_connection(path: &str) -> Result<()> {
+    SqliteDriver::ping(path).await
 }
 
 #[derive(Debug, Default, Clone)]
