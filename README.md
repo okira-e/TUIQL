@@ -2,6 +2,10 @@
 
 A fully-featured SQL database client that lives in your terminal. Fast, keyboard-driven, and designed to replace heavyweight GUI clients.
 
+![promo](./assets/demo.gif)
+
+[Watch It On Youtube Here](https://youtu.be/kq2OhHbSBoQ)
+
 ## Why tuiql?
 
 Most terminal database tools are either too basic or painful to use. tuiql gives you the power of a native database client — table browsing, filtering, sorting, pagination, JSON viewing, theming — without ever leaving the terminal.
