@@ -16,17 +16,21 @@ pub struct AppArgs {
 
 #[derive(Debug, Args)]
 pub struct ConnectCmdArgs {
-    /// The type of database: "postgres" | "mysql" | "mariadb" | "sqlite".
+    /// The type of database: "postgres" | "mysql" | "mariadb" | "sqlite" | "turso".
     #[arg(long)]
     pub r#type: drivers::kinds::DbKind,
 
-    /// Connection URL (required for postgres, mysql, mariadb).
+    /// Connection URL (required for postgres, mysql, mariadb, turso).
     #[arg(long)]
     pub url: Option<String>,
 
     /// Path to the SQLite database file (required for sqlite).
     #[arg(long)]
     pub path: Option<String>,
+
+    /// Auth token (required for turso). Falls back to TURSO_AUTH_TOKEN env var.
+    #[arg(long)]
+    pub token: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -43,7 +47,7 @@ pub struct RemoveConnectionCmdArgs {
 
 #[derive(Debug, Args)]
 pub struct SaveConnectionCmdArgs {
-    /// The type of database: "postgres" | "mysql" | "mariadb" | "sqlite".
+    /// The type of database: "postgres" | "mysql" | "mariadb" | "sqlite" | "turso".
     #[arg(long)]
     pub r#type: drivers::kinds::DbKind,
     /// The name of the connection.
@@ -64,4 +68,7 @@ pub struct SaveConnectionCmdArgs {
     /// Path to the SQLite database file (required for sqlite).
     #[arg(long)]
     pub path: Option<String>,
+    /// Connection URL (required for turso, e.g. libsql://my-db.turso.io).
+    #[arg(long)]
+    pub url: Option<String>,
 }

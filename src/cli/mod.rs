@@ -14,9 +14,11 @@ use crate::config::project::load_project_config;
 use crate::config::settings::load_settings;
 use crate::drivers;
 use crate::drivers::DbDriver;
+use crate::drivers::kinds::DbKind;
 use clap::Subcommand;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
+use color_eyre::eyre::eyre;
 use tabled::Table;
 use tabled::Tabled;
 use url::Url;
@@ -88,28 +90,46 @@ async fn run_app(db_driver: DbDriver, project_name: Option<&str>) -> Result<()> 
 }
 
 async fn connect_directly(args: args::ConnectCmdArgs) -> Result<()> {
-    let url = match args.r#type {
-        drivers::kinds::DbKind::SQLite => {
+    let (url, auth_token) = match args.r#type {
+        DbKind::SQLite => {
             let path = args.path.ok_or_else(|| {
-                color_eyre::eyre::eyre!(
+                eyre!(
                     "Missing --path for sqlite connection.\n\nUsage for sqlite:\n  {} connect --type sqlite --path <PATH_TO_DB_FILE>",
                     env!("CARGO_PKG_NAME")
                 )
             })?;
-            format!("sqlite:{}", path)
+            (format!("sqlite:{}", path), None)
         }
-        _ => args.url.ok_or_else(|| {
-            color_eyre::eyre::eyre!(
-                "Missing --url for {} connection.\n\nUsage for {}:\n  {} connect --type {} --url <CONNECTION_URL>",
-                args.r#type,
-                args.r#type,
-                env!("CARGO_PKG_NAME"),
-                args.r#type
-            )
-        })?,
+        DbKind::Turso => {
+            let url = args.url.ok_or_else(|| {
+                eyre!(
+                    "Missing --url for turso connection.\n\nUsage for turso:\n  {} connect --type turso --url libsql://<HOST> --token <TOKEN>",
+                    env!("CARGO_PKG_NAME")
+                )
+            })?;
+            let token = args
+                .token
+                .or_else(|| std::env::var("TURSO_AUTH_TOKEN").ok())
+                .ok_or_else(|| {
+                    eyre!("Missing auth token for turso connection. Pass --token or set TURSO_AUTH_TOKEN.")
+                })?;
+            (url, Some(token))
+        }
+        _ => {
+            let url = args.url.ok_or_else(|| {
+                eyre!(
+                    "Missing --url for {} connection.\n\nUsage for {}:\n  {} connect --type {} --url <CONNECTION_URL>",
+                    args.r#type,
+                    args.r#type,
+                    env!("CARGO_PKG_NAME"),
+                    args.r#type
+                )
+            })?;
+            (url, None)
+        }
     };
 
-    let db_driver = drivers::new_connection(args.r#type, &url).await?;
+    let db_driver = drivers::new_connection(args.r#type, &url, auth_token.as_deref()).await?;
     return run_app(db_driver, None).await;
 }
 
@@ -126,15 +146,20 @@ async fn open_connection(args: args::OpenCmdArgs) -> Result<()> {
         }
     };
 
-    let db_driver = drivers::new_connection(connection.kind, &connection.url).await?;
+    let db_driver = drivers::new_connection(
+        connection.kind,
+        &connection.url,
+        connection.auth_token.as_deref(),
+    )
+    .await?;
     return run_app(db_driver, Some(&connection.name)).await;
 }
 
 async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
     let conn = match args.r#type {
-        drivers::kinds::DbKind::SQLite => {
+        DbKind::SQLite => {
             let path = args.path.ok_or_else(|| {
-                color_eyre::eyre::eyre!(
+                eyre!(
                     "Missing --path for sqlite connection.\n\nUsage for sqlite:\n  {} add --type sqlite --name <NAME> --path <PATH_TO_DB_FILE>",
                     env!("CARGO_PKG_NAME")
                 )
@@ -146,6 +171,26 @@ async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
                 name: args.name,
                 kind: args.r#type,
                 url: format!("sqlite:{}", path),
+                auth_token: None,
+            }
+        }
+        DbKind::Turso => {
+            let url = args.url.ok_or_else(|| {
+                eyre!(
+                    "Missing --url for turso connection.\n\nUsage for turso:\n  {} add --type turso --name <NAME> --url libsql://<HOST>",
+                    env!("CARGO_PKG_NAME")
+                )
+            })?;
+
+            let token = rpassword::prompt_password("Turso auth token: ")?;
+
+            drivers::ping_turso_connection(&url, &token).await?;
+
+            Connection {
+                name: args.name,
+                kind: args.r#type,
+                url,
+                auth_token: Some(token),
             }
         }
         _ => {
@@ -186,12 +231,14 @@ async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
                     "{}://{}:{}@{}:{}/{}",
                     args.r#type, user, password, host, port, database
                 ),
+                auth_token: None,
             }
         }
     };
 
     add_connection(conn)?;
 
+    println!("Saved connections:\n");
     list_connections()?;
 
     return Ok(());
@@ -199,7 +246,8 @@ async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
 
 fn remove_saved_connection(args: args::RemoveConnectionCmdArgs) -> Result<()> {
     remove_connection(&args.connection_name)?;
-    list_connections()?;
+    println!("Successfully removed the connection.");
+
     return Ok(());
 }
 
@@ -238,6 +286,26 @@ fn list_connections() -> Result<()> {
                 };
             }
 
+            if matches!(connection.kind, DbKind::Turso) {
+                let host = Url::parse(&connection.url)
+                    .ok()
+                    .and_then(|u| u.host_str().map(|s| s.to_string()))
+                    .unwrap_or_else(|| connection.url.clone());
+                return ExtendedDatabaseConnection {
+                    name: connection.name.clone(),
+                    scheme: "turso".to_string(),
+                    user: String::new(),
+                    password: if connection.auth_token.is_some() {
+                        "****".to_string()
+                    } else {
+                        String::new()
+                    },
+                    host,
+                    port: String::new(),
+                    db_name: String::new(),
+                };
+            }
+
             let url = Url::parse(&connection.url).unwrap();
 
             let scheme = url.scheme().to_string();
@@ -247,7 +315,7 @@ fn list_connections() -> Result<()> {
             let port = url.port_or_known_default().unwrap_or(0).to_string();
             let db_name = url.path().trim_start_matches('/').to_string();
 
-            ExtendedDatabaseConnection {
+            return ExtendedDatabaseConnection {
                 name: connection.name.clone(),
                 scheme,
                 user,
@@ -255,14 +323,13 @@ fn list_connections() -> Result<()> {
                 host,
                 port,
                 db_name,
-            }
+            };
         })
         .collect::<Vec<_>>();
 
     let mut table = Table::new(extended_connections);
     table.with(tabled::settings::Style::ascii_rounded());
 
-    println!("Saved connections:\n");
     println!("{}", table);
 
     Ok(())
