@@ -13,6 +13,8 @@ pub struct Connection {
     pub name: String,
     pub kind: DbKind,
     pub url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_token: Option<String>,
 }
 
 /// Loads all database connections stored by the user.

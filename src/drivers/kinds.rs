@@ -12,6 +12,8 @@ pub enum DbKind {
     Postgres,
     #[serde(rename = "sqlite")]
     SQLite,
+    #[serde(rename = "turso")]
+    Turso,
 }
 impl FromStr for DbKind {
     type Err = color_eyre::eyre::Error;
@@ -22,6 +24,7 @@ impl FromStr for DbKind {
             "mariadb" => Ok(DbKind::Mariadb),
             "postgres" => Ok(DbKind::Postgres),
             "sqlite" => Ok(DbKind::SQLite),
+            "turso" => Ok(DbKind::Turso),
             _ => bail!("Unsupported database type"),
         }
     }
@@ -34,6 +37,7 @@ impl std::fmt::Display for DbKind {
             DbKind::Mariadb => write!(f, "mariadb"),
             DbKind::Postgres => write!(f, "postgres"),
             DbKind::SQLite => write!(f, "sqlite"),
+            DbKind::Turso => write!(f, "turso"),
         }
     }
 }
