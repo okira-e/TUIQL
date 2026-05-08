@@ -18,6 +18,7 @@ No mouse required. No Electron. No waiting.
 - MySQL
 - MariaDB
 - SQLite
+- Turso
 
 ## Install
 
