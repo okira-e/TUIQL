@@ -3,72 +3,70 @@ use crate::drivers::QueryResult;
 use crate::utils;
 use color_eyre::Result;
 use dashmap::DashMap;
-use sqlx::Row;
-use sqlx::sqlite::SqliteRow;
+use libsql::Builder;
+use libsql::Connection;
+use libsql::params;
 
 pub struct SqliteDriver {
-    pool: sqlx::sqlite::SqlitePool,
+    conn: Connection,
     pk_columns_cache: DashMap<String, Vec<String>>,
     table_columns_cache: DashMap<String, Vec<ColumnMetadata>>,
 }
 
 impl SqliteDriver {
     pub async fn new_pool(dsn: &str) -> Result<Self> {
-        let pool = sqlx::sqlite::SqlitePoolOptions::new()
-            .max_connections(2)
-            .acquire_timeout(std::time::Duration::from_secs(3))
-            .idle_timeout(std::time::Duration::from_secs(600))
-            .connect(dsn)
-            .await?;
+        let path = dsn.strip_prefix("sqlite:").unwrap_or(dsn);
+        let db = Builder::new_local(path).build().await?;
+        let conn = db.connect()?;
 
         return Ok(Self {
-            pool,
+            conn,
             pk_columns_cache: DashMap::new(),
             table_columns_cache: DashMap::new(),
         });
     }
 
     pub async fn ping(path: &str) -> Result<()> {
-        let dsn = format!("sqlite:{}", path);
-        let temp_pool = sqlx::sqlite::SqlitePoolOptions::new()
-            .max_connections(1)
-            .acquire_timeout(std::time::Duration::from_secs(3))
-            .connect(&dsn)
-            .await?;
-
-        sqlx::query("SELECT 1").fetch_one(&temp_pool).await?;
+        let db = Builder::new_local(path).build().await?;
+        let conn = db.connect()?;
+        let mut rows = conn.query("SELECT 1", ()).await?;
+        let _ = rows.next().await?;
 
         return Ok(());
     }
 
     pub async fn get_tables(&self) -> Result<Vec<String>> {
-        let rows: Vec<SqliteRow> = sqlx::query(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+                (),
+            )
+            .await?;
 
-        let tables = rows
-            .into_iter()
-            .map(|row| row.try_get::<String, _>("name").unwrap())
-            .collect();
+        let mut out = Vec::new();
+        while let Some(row) = rows.next().await? {
+            out.push(row.get::<String>(0)?);
+        }
 
-        return Ok(tables);
+        return Ok(out);
     }
 
     pub async fn get_views(&self) -> Result<Vec<String>> {
-        let rows: Vec<SqliteRow> = sqlx::query(
-            "SELECT name FROM sqlite_master WHERE type = 'view' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT name FROM sqlite_master WHERE type = 'view' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+                (),
+            )
+            .await?;
 
-        let views = rows
-            .into_iter()
-            .map(|row| row.try_get::<String, _>("name").unwrap())
-            .collect();
+        let mut out = Vec::new();
+        while let Some(row) = rows.next().await? {
+            out.push(row.get::<String>(0)?);
+        }
 
-        return Ok(views);
+        return Ok(out);
     }
 
     pub async fn get_materialized_views(&self) -> Result<Vec<String>> {
@@ -132,19 +130,16 @@ impl SqliteDriver {
             order_sql = order_sql,
         );
 
-        let rows: Vec<SqliteRow> = sqlx::query(&sql)
-            .bind(limit as i64)
-            .bind(offset as i64)
-            .fetch_all(&self.pool)
+        let mut rows = self
+            .conn
+            .query(&sql, params![limit as i64, offset as i64])
             .await?;
 
-        let out_rows: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(|row| {
-                let raw: String = row.get("row");
-                serde_json::from_str(&raw).unwrap()
-            })
-            .collect();
+        let mut out_rows: Vec<serde_json::Value> = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let raw: String = row.get(0)?;
+            out_rows.push(serde_json::from_str(&raw)?);
+        }
 
         return Ok(QueryResult { columns, rows: out_rows });
     }
@@ -159,7 +154,12 @@ impl SqliteDriver {
 
         let sql = format!("SELECT COUNT(*) AS \"count\" FROM {}{}", ident, where_sql);
 
-        let count: i64 = sqlx::query(&sql).fetch_one(&self.pool).await?.get("count");
+        let mut rows = self.conn.query(&sql, ()).await?;
+        let row = rows
+            .next()
+            .await?
+            .ok_or_else(|| color_eyre::eyre::eyre!("COUNT(*) returned no rows"))?;
+        let count: i64 = row.get(0)?;
 
         return Ok(count as usize);
     }
@@ -185,13 +185,15 @@ impl SqliteDriver {
 
         let sql = format!("PRAGMA table_info({})", utils::quote_ident(table_name));
 
-        let mut pk_cols: Vec<String> = sqlx::query(&sql)
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .filter(|row| row.get::<i32, _>("pk") > 0)
-            .map(|row| row.get::<String, _>("name"))
-            .collect();
+        let mut rows = self.conn.query(&sql, ()).await?;
+        let mut pk_cols: Vec<String> = Vec::new();
+        while let Some(row) = rows.next().await? {
+            // table_info columns: cid, name, type, notnull, dflt_value, pk
+            let pk: i64 = row.get(5)?;
+            if pk > 0 {
+                pk_cols.push(row.get::<String>(1)?);
+            }
+        }
 
         // Sort integer-like PK columns first
         let all_columns = self.get_columns(table_name).await?;
@@ -220,12 +222,14 @@ impl SqliteDriver {
 
         let sql = format!("PRAGMA table_info({})", utils::quote_ident(table_name));
 
-        let columns: Vec<ColumnMetadata> = sqlx::query(&sql)
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|row: SqliteRow| ColumnMetadata { name: row.get("name"), data_type: row.get("type") })
-            .collect();
+        let mut rows = self.conn.query(&sql, ()).await?;
+        let mut columns: Vec<ColumnMetadata> = Vec::new();
+        while let Some(row) = rows.next().await? {
+            // table_info columns: cid, name, type, notnull, dflt_value, pk
+            let name: String = row.get(1)?;
+            let data_type: String = row.get(2)?;
+            columns.push(ColumnMetadata { name, data_type });
+        }
 
         self.table_columns_cache.insert(table_name.to_string(), columns.clone());
 
