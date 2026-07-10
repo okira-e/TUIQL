@@ -197,6 +197,16 @@ impl App {
                     return;
                 }
 
+                (_, KeyCode::Tab) => {
+                    self.update(Action::CmdLine(CmdLineAction::NextSuggestion));
+                    return;
+                }
+
+                (_, KeyCode::BackTab) => {
+                    self.update(Action::CmdLine(CmdLineAction::PrevSuggestion));
+                    return;
+                }
+
                 (_, KeyCode::Esc) | (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
                     self.update(Action::CmdLine(CmdLineAction::Exit));
                     return;

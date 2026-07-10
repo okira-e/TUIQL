@@ -109,6 +109,8 @@ pub enum CmdLineAction {
     ToggleOrderByClause,
     TogglePrevCommand,
     ToggleNextCommand,
+    NextSuggestion,
+    PrevSuggestion,
     Execute,
     Exit,
 }

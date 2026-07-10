@@ -1,10 +1,12 @@
 use crate::app::App;
 use crate::app::RightView;
 use crate::app::View;
+use crate::models::statusline_model::StatusLineMode;
 use crate::views::explorer_view::render_explorer;
 use crate::views::help_view::render_help_view;
 use crate::views::json_view::render_json_view;
 use crate::views::statusline_view::render_statusline;
+use crate::views::suggestions_popup_view::render_suggestions_popup;
 use crate::views::table_view::render_table;
 use ratatui::Frame;
 use ratatui::style::Style;
@@ -75,5 +77,16 @@ impl App {
             focused_view == View::StatusLine,
             self.is_loading,
         );
+
+        if self.statusline_model.mode == StatusLineMode::Command
+            && !self.statusline_model.completion.candidates.is_empty()
+        {
+            render_suggestions_popup(
+                &self.statusline_model.completion,
+                &self.theme,
+                frame,
+                self.widgets_chunks.statusline_chunk,
+            );
+        }
     }
 }

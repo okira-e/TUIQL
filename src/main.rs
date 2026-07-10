@@ -13,6 +13,7 @@ mod theme;
 mod update;
 mod utils;
 mod views;
+mod suggestor;
 
 use clap::Parser;
 use color_eyre::Result;

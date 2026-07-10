@@ -51,7 +51,7 @@ pub fn render_table(
         format!("Page {} - Rows {}", page, model.results_row_count)
     };
 
-    let title = model.table_name.clone().unwrap_or("Query Result".to_string());
+    let title: String = model.table_name.clone().unwrap_or("Query Result".to_string());
 
     let title_line = if !default_sort.is_empty() && !model.query_result.rows.is_empty() {
         Line::from(vec![
