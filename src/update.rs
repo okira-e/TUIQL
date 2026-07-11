@@ -99,6 +99,7 @@ impl App {
             AppAction::ReportError(err_report) => {
                 let msg = format!("{}", err_report);
                 self.report_message(&msg, MsgKind::Error, MsgLifetime::Long);
+                self.focus_pane(self.prev_focused_pane);
             }
             AppAction::StartLoading => self.is_loading = true,
             AppAction::StopLoading => self.is_loading = false,

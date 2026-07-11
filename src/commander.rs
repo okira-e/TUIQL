@@ -31,7 +31,7 @@ pub fn parse_cmd(input: &str) -> Result<Cmd> {
     let cmd = iter.next();
     return match cmd {
         Some(cmd) => match cmd {
-            "q" | "quit" => Ok(Cmd::Quit),
+            "qa" | "q" | "quit" => Ok(Cmd::Quit),
             "c" | "count" => Ok(Cmd::Count),
             "tc" | "total-count" => Ok(Cmd::TotalCount),
             "g" | "goto" => parse_goto_cmd(&mut iter),
@@ -228,6 +228,7 @@ mod tests {
     fn test_parse_quit_command() {
         assert!(matches!(parse_cmd("quit").unwrap(), Cmd::Quit));
         assert!(matches!(parse_cmd("q").unwrap(), Cmd::Quit));
+        assert!(matches!(parse_cmd("qa").unwrap(), Cmd::Quit));
     }
 
     #[test]
