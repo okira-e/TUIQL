@@ -92,6 +92,7 @@ impl App {
             AppAction::SetCommandMode => {
                 self.statusline_model.mode = StatusLineMode::Command;
                 self.focus_pane(Pane::StatusLine);
+                self.refresh_suggestions();
             }
             AppAction::CloseJsonView => {
                 self.right_view = RightView::ResultsTable;
@@ -611,6 +612,12 @@ impl App {
                     }
                 }
             }
+            CmdLineAction::NextSuggestion => {
+                self.statusline_model.cycle_completion(true);
+            }
+            CmdLineAction::PrevSuggestion => {
+                self.statusline_model.cycle_completion(false);
+            }
             CmdLineAction::AddChar(character) => {
                 if character == ' ' && self.statusline_model.cmd.text.is_empty() {
                     return;
@@ -621,6 +628,7 @@ impl App {
                     .text
                     .insert(self.statusline_model.cmd.cursor, character);
                 self.statusline_model.cmd.cursor += 1;
+                self.refresh_suggestions();
             }
             CmdLineAction::PopWord => {
                 if self.statusline_model.cmd.cursor > 0 {
@@ -641,16 +649,20 @@ impl App {
                         .text
                         .drain(new_cursor..self.statusline_model.cmd.cursor);
                     self.statusline_model.cmd.cursor = new_cursor;
+
+                    self.refresh_suggestions();
                 }
             }
             CmdLineAction::PopLine => {
                 self.statusline_model.cmd.text.drain(..self.statusline_model.cmd.cursor);
                 self.statusline_model.cmd.cursor = 0;
+                self.refresh_suggestions();
             }
             CmdLineAction::PopChar => {
                 if self.statusline_model.cmd.cursor > 0 {
                     self.statusline_model.cmd.cursor -= 1;
                     self.statusline_model.cmd.text.remove(self.statusline_model.cmd.cursor);
+                    self.refresh_suggestions();
                 }
             }
             CmdLineAction::MoveLeft => {
@@ -709,6 +721,7 @@ impl App {
                 );
                 self.statusline_model.cmd.cursor = self.statusline_model.cmd.text.len();
                 self.focus_pane(Pane::StatusLine);
+                self.refresh_suggestions();
             }
             CmdLineAction::ToggleOrderByClause => {
                 self.statusline_model.mode = StatusLineMode::Command;
@@ -722,6 +735,7 @@ impl App {
                 );
                 self.statusline_model.cmd.cursor = self.statusline_model.cmd.text.len();
                 self.focus_pane(Pane::StatusLine);
+                self.refresh_suggestions();
             }
             CmdLineAction::TogglePrevCommand => {
                 if let Some(config) = &self.config {
@@ -745,6 +759,7 @@ impl App {
                         break;
                     }
                 }
+                self.refresh_suggestions();
             }
             CmdLineAction::ToggleNextCommand => {
                 if let Some(config) = &self.config {
@@ -772,6 +787,7 @@ impl App {
                         self.statusline_model.cmd.cursor = 0;
                     }
                 }
+                self.refresh_suggestions();
             }
             CmdLineAction::Exit => {
                 self.focus_pane(self.prev_focused_pane);

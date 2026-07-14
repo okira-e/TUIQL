@@ -6,6 +6,7 @@ use color_eyre::eyre::bail;
 use serde::Deserialize;
 use serde::Serialize;
 
+// @Settings
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Settings {
     #[serde(default = "default_false")]

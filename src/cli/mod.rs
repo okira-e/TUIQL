@@ -328,7 +328,7 @@ fn list_connections() -> Result<()> {
         .collect::<Vec<_>>();
 
     let mut table = Table::new(extended_connections);
-    table.with(tabled::settings::Style::ascii_rounded());
+    table.with(tabled::settings::Style::rounded());
 
     println!("{}", table);
 

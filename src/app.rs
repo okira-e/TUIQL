@@ -20,6 +20,8 @@ use crate::models::statusline_model::StatusLineMsg;
 use crate::models::table_model::QueryState;
 use crate::models::table_model::TableModel;
 use crate::settings::Settings;
+use crate::suggestor::CompletionContext;
+use crate::suggestor::suggest;
 use crate::theme::Flavor;
 use crate::theme::Theme;
 use color_eyre::Result;
@@ -32,6 +34,7 @@ use ratatui::layout::Rect;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
+use tracing::debug;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum View {
@@ -265,5 +268,24 @@ impl App {
         self.table_model.query_state = QueryState::new(&self.settings);
 
         let _ = self.action_tx.send(Action::Db(DbAction::QueryTable));
+    }
+
+    pub fn refresh_suggestions(&mut self) {
+        let mut tables: Vec<&'_ str> = Vec::with_capacity(self.explorer_model.items.len());
+        for item in self.explorer_model.items.iter() {
+            if item.kind == ExplorerItemKind::Table {
+                tables.push(item.name.as_str());
+            }
+        }
+
+        let mut columns: Vec<&'_ str> = Vec::with_capacity(self.table_model.query_result.columns.len());
+        for col in self.table_model.query_result.columns.iter() {
+            columns.push(col.name.as_str());
+        }
+
+        let ctx = CompletionContext { tables: tables.as_ref(), columns: columns.as_ref() };
+
+        self.statusline_model.completion.candidates = suggest(&ctx, &self.statusline_model.cmd.text);
+        self.statusline_model.completion.selected = None;
     }
 }

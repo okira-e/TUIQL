@@ -10,7 +10,6 @@ use ratatui::text::Text;
 use ratatui::widgets::Block;
 use ratatui::widgets::BorderType;
 use ratatui::widgets::Borders;
-use ratatui::widgets::Clear;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Wrap;
 use serde::Serialize;
@@ -26,10 +25,8 @@ pub fn render_json_view(model: &JsonViewModel, theme: &Theme, frame: &mut Frame,
 
             let lines: Vec<Line> = pretty.lines().map(Line::from).collect();
 
-            frame.render_widget(Clear, area);
-
             let block = Block::default()
-                .title("JSON VIEW")
+                .title("JSON View")
                 .title_alignment(Alignment::Center)
                 .border_style(if focused { theme.pane_focus } else { Color::default() })
                 .border_type(BorderType::Double)

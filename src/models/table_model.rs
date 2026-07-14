@@ -51,9 +51,7 @@ impl TableModel {
             current_page: Default::default(),
         }
     }
-}
 
-impl TableModel {
     pub fn reset_ui(&mut self, selected_row: Option<usize>) {
         self.horizontal_scroll_offset = 0;
         *self.ratatui_table_state.offset_mut() = 0;
