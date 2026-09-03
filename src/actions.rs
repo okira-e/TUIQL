@@ -124,6 +124,7 @@ pub enum AppCmd {
     Where(Option<String>),
     Limit(usize),
     SettingChange(String, Option<String>),
+    ChangeTheme(String),
 }
 
 // Implementing this so that we don't get the entire result object in the log file with enum variants

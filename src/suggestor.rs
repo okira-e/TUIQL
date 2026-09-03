@@ -1,3 +1,5 @@
+use crate::theme::Theme;
+
 #[derive(Debug, Clone, Copy)]
 pub enum SuggestionKind {
     Command,
@@ -140,6 +142,7 @@ const COMMANDS: &[Spec] = &[
     Spec { names: &["limit", "l"], slots: &[] }, // number, no candidates
     Spec { names: &["refresh"], slots: &[] },
     Spec { names: &["set"], slots: &[Source::SettingKey(SETTINGS)] },
+    Spec { names: &["theme"], slots: &[Source::SettingKey(Theme::options())] },
     Spec { names: &["help"], slots: &[] },
 ];
 

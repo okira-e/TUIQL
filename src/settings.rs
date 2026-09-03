@@ -16,6 +16,8 @@ pub struct Settings {
     /// "asc" or "desc"
     #[serde(default = "default_sort")]
     pub default_sort: String,
+    #[serde(default = "default_theme")]
+    pub theme: String,
 }
 
 impl App {
@@ -60,6 +62,14 @@ impl App {
 
                 self.settings.default_sort = value;
             }
+            "theme" => {
+                let value = match value_input {
+                    Some(input) => input,
+                    None => bail!("Missing theme name"),
+                };
+
+                self.settings.theme = value;
+            }
             _ => bail!("Unknown settings key: {}", key),
         }
 
@@ -79,4 +89,8 @@ pub fn default_limit() -> u16 {
 
 pub fn default_sort() -> String {
     return String::from("asc");
+}
+
+pub fn default_theme() -> String {
+    return String::from("catppuccin-mocha");
 }

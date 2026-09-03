@@ -22,7 +22,6 @@ use crate::models::table_model::TableModel;
 use crate::settings::Settings;
 use crate::suggestor::CompletionContext;
 use crate::suggestor::suggest;
-use crate::theme::Flavor;
 use crate::theme::Theme;
 use color_eyre::Result;
 use crossterm::event::EventStream;
@@ -34,7 +33,6 @@ use ratatui::layout::Rect;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
-use tracing::debug;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum View {
@@ -100,7 +98,10 @@ impl App {
     pub async fn new(settings: Settings, db_driver: drivers::DbDriver, config: Option<ProjectConfig>) -> Self {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
 
-        let theme = Theme::catppuccin(Flavor::Mocha);
+        let theme: Theme = match settings.theme.parse() {
+            Ok(t) => t,
+            Err(_) => Theme::catppuccin_mocha(),
+        };
 
         let table_model = TableModel::new(&settings);
         let project_name = if let Some(ref config) = config {
@@ -117,7 +118,7 @@ impl App {
             action_tx: action_tx,
             action_rx: action_rx,
             db_driver: Arc::new(Mutex::new(db_driver)),
-            theme: theme,
+            theme,
             focused_pane: Pane::Left,
             right_view: RightView::ResultsTable,
             widgets_chunks: WidgetsChunks::default(),
@@ -253,6 +254,7 @@ impl App {
             Cmd::Limit(limit) => Ok(Action::Cmd(AppCmd::Limit(limit))),
             Cmd::RefreshTable => Ok(Action::Db(DbAction::QueryTable)),
             Cmd::Set(key, value) => Ok(Action::Cmd(AppCmd::SettingChange(key, value))),
+            Cmd::ChangeTheme(value) => Ok(Action::Cmd(AppCmd::ChangeTheme(value))),
             Cmd::OpenHelp => Ok(Action::App(AppAction::OpenHelp)),
         };
     }

@@ -17,6 +17,7 @@ pub enum Cmd {
     Limit(usize),
     RefreshTable,
     Set(String, Option<String>),
+    ChangeTheme(String),
     OpenHelp,
 }
 
@@ -41,6 +42,7 @@ pub fn parse_cmd(input: &str) -> Result<Cmd> {
             "l" | "limit" => parse_limit_cmd(&mut iter),
             "r" | "refresh" => Ok(Cmd::RefreshTable),
             "set" => parse_set_cmd(&mut iter),
+            "theme" => parse_theme_cmd(&mut iter),
             "help" | "h" => Ok(Cmd::OpenHelp),
             _ => bail!("Unknown command: {}", cmd),
         },
@@ -130,6 +132,13 @@ fn parse_set_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
 
             Ok(Cmd::Set(key.to_string(), value))
         }
+        None => bail!("Set command needs a key at least"),
+    };
+}
+
+fn parse_theme_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
+    return match iter.next() {
+        Some(theme) => Ok(Cmd::ChangeTheme(theme.to_string())),
         None => bail!("Set command needs a key at least"),
     };
 }

@@ -1024,6 +1024,13 @@ impl App {
                 }
                 self.focus_pane(self.prev_focused_pane);
             }
+            AppCmd::ChangeTheme(theme) => {
+                if let Err(err) = self.update_settings("theme".to_string(), Some(theme.clone())) {
+                    self.report_message(&err.to_string(), MsgKind::Error, MsgLifetime::Long);
+                }
+                self.theme = theme.as_str().parse().unwrap();
+                self.focus_pane(self.prev_focused_pane);
+            }
         };
     }
 
