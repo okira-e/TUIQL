@@ -4,8 +4,6 @@ A fully-featured SQL database client that lives in your terminal. Fast, keyboard
 
 ![promo](./assets/demo.gif)
 
-[Watch It On Youtube Here](https://youtu.be/kq2OhHbSBoQ)
-
 ## Why tuiql?
 
 Most terminal database tools are either too basic or painful to use. tuiql gives you the power of a native database client — table browsing, filtering, sorting, pagination, JSON viewing, theming — without ever leaving the terminal.
@@ -94,6 +92,7 @@ Press `:` to enter command mode.
 | order-by col desc | ob        | Add ORDER BY (no args to reset)                              |
 | where col = 'val' | w         | Add WHERE clause (no args to reset)                          |
 | set key value     |           | Change a setting at runtime                                  |
+| theme name        |           | Change the current theme at runtime                          |
 
 ## Features
 
@@ -110,11 +109,12 @@ Run `tuiql --config-path` to see where your config files are stored.
 
 ### Settings
 
-| Setting                | Options         | Default | Description                                      |
-| ---------------------- | --------------- | ------- | ------------------------------------------------ |
-| transparent_background | `true`, `false` | `false` | Use terminal background instead of theme color   |
-| default_limit          | number          | `200`   | Sets the default query limit on every table      |
-| default_sort           | "asc", "desc"   | "asc"   | Sets the default sorting direction on table load |
+| Setting                | Options             | Default          | Description                                      |
+| ---------------------- | ------------------- | ---------------- | ------------------------------------------------ |
+| transparent_background | `true`, `false`     | `false`          | Use terminal background instead of theme color   |
+| default_limit          | number              | `200`            | Sets the default query limit on every table      |
+| default_sort           | "asc", "desc"       | "asc"            | Sets the default sorting direction on table load |
+| theme                  | supported thme name | catppuccin-mocha | Sets the default theme                           |
 
 ## License
 
