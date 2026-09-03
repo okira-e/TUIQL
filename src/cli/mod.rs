@@ -2,6 +2,7 @@ pub mod args;
 
 use crate::app::App;
 use crate::cli::args::ConnectCmdArgs;
+use crate::cli::args::EditConnectionCmdArgs;
 use crate::cli::args::OpenCmdArgs;
 use crate::cli::args::RemoveConnectionCmdArgs;
 use crate::cli::args::RenameProjectCmdArgs;
@@ -11,6 +12,7 @@ use crate::config::connection::add_connection;
 use crate::config::connection::load_connections;
 use crate::config::connection::remove_connection;
 use crate::config::connection::rename_project;
+use crate::config::connection::update_connection;
 use crate::config::get_config_dir_path_based_on_os;
 use crate::config::project::load_project_config;
 use crate::config::settings::load_settings;
@@ -31,6 +33,8 @@ pub enum Commands {
     Connect(ConnectCmdArgs),
     /// Open a saved connection to a database.
     Open(OpenCmdArgs),
+    /// Edit a saved database connection.
+    Edit(EditConnectionCmdArgs),
     /// List all saved connections.
     #[command(alias = "ls")]
     List,
@@ -72,6 +76,7 @@ async fn exec_command(command: Commands) -> Result<()> {
     return match command {
         Commands::Connect(args) => connect_directly(args).await,
         Commands::Open(args) => open_connection(args).await,
+        Commands::Edit(args) => edit_saved_connection(args).await,
         Commands::List => list_connections(),
         Commands::Add(args) => save_connection(args).await,
         Commands::Remove(args) => remove_saved_connection(args),
@@ -158,6 +163,130 @@ async fn open_connection(args: args::OpenCmdArgs) -> Result<()> {
     )
     .await?;
     return run_app(db_driver, Some(&connection.name)).await;
+}
+
+async fn edit_saved_connection(args: args::EditConnectionCmdArgs) -> Result<()> {
+    if args.host.is_none()
+        && args.user.is_none()
+        && args.port.is_none()
+        && args.database.is_none()
+        && args.path.is_none()
+        && args.url.is_none()
+        && !args.password
+        && !args.token
+    {
+        bail!("No changes provided");
+    }
+
+    let connections = load_connections()?;
+    let mut connection = match connections
+        .iter()
+        .find(|connection| connection.name == args.connection_name)
+    {
+        Some(connection) => connection.clone(),
+        None => bail!("Connection \"{}\" not found", args.connection_name),
+    };
+
+    match connection.kind {
+        DbKind::SQLite => {
+            let unsupported = [
+                ("--host", args.host.is_some()),
+                ("--user", args.user.is_some()),
+                ("--port", args.port.is_some()),
+                ("--database", args.database.is_some()),
+                ("--url", args.url.is_some()),
+                ("--password", args.password),
+                ("--token", args.token),
+            ];
+            reject_unsupported_options(connection.kind, &unsupported)?;
+
+            if let Some(path) = args.path {
+                drivers::ping_sqlite_connection(&path).await?;
+                connection.url = format!("sqlite:{}", path);
+            }
+        }
+        DbKind::Turso => {
+            let unsupported = [
+                ("--host", args.host.is_some()),
+                ("--user", args.user.is_some()),
+                ("--port", args.port.is_some()),
+                ("--database", args.database.is_some()),
+                ("--path", args.path.is_some()),
+                ("--password", args.password),
+            ];
+            reject_unsupported_options(connection.kind, &unsupported)?;
+
+            if let Some(url) = args.url {
+                connection.url = url;
+            }
+            if args.token {
+                connection.auth_token = Some(rpassword::prompt_password("Turso auth token: ")?);
+            }
+
+            let token = connection
+                .auth_token
+                .as_deref()
+                .ok_or_else(|| eyre!("This Turso connection has no auth token. Use --token to set one."))?;
+            drivers::ping_turso_connection(&connection.url, token).await?;
+        }
+        DbKind::Postgres | DbKind::MySQL | DbKind::Mariadb => {
+            let unsupported = [
+                ("--path", args.path.is_some()),
+                ("--url", args.url.is_some()),
+                ("--token", args.token),
+            ];
+            reject_unsupported_options(connection.kind, &unsupported)?;
+
+            let mut url = Url::parse(&connection.url)?;
+
+            if let Some(host) = args.host {
+                url.set_host(Some(&host)).map_err(|_| eyre!("Invalid host: {}", host))?;
+            }
+            if let Some(user) = args.user {
+                url.set_username(&user).map_err(|_| eyre!("Invalid user: {}", user))?;
+            }
+            if let Some(port) = args.port {
+                url.set_port(Some(port)).map_err(|_| eyre!("Invalid port: {}", port))?;
+            }
+            if let Some(database) = args.database {
+                url.set_path(&format!("/{}", database.trim_start_matches('/')));
+            }
+            if args.password {
+                let password = rpassword::prompt_password("Database password: ")?;
+                url.set_password(Some(&password))
+                    .map_err(|_| eyre!("Unable to set the database password"))?;
+            }
+
+            connection.url = url.to_string();
+            let _ = drivers::new_connection(connection.kind, &connection.url, None).await?;
+        }
+    }
+
+    update_connection(&args.connection_name, connection)?;
+
+    println!(
+        "Successfully updated connection \"{}\".",
+        args.connection_name
+    );
+
+    return Ok(());
+}
+
+fn reject_unsupported_options(kind: DbKind, options: &[(&str, bool)]) -> Result<()> {
+    let unsupported = options
+        .iter()
+        .filter_map(|(name, provided)| provided.then_some(*name))
+        .collect::<Vec<_>>();
+
+    if !unsupported.is_empty() {
+        bail!(
+            "The following options are not supported for {} connections: {}",
+            kind,
+            unsupported.join(", ")
+        );
+    }
+
+    return Ok(());
 }
 
 async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {

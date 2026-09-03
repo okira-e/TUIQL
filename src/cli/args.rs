@@ -34,6 +34,44 @@ pub struct ConnectCmdArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct EditConnectionCmdArgs {
+    /// The name of the saved connection to edit.
+    pub connection_name: String,
+
+    /// Replace the host (postgres, mysql, mariadb).
+    #[arg(long)]
+    pub host: Option<String>,
+
+    /// Replace the user (postgres, mysql, mariadb).
+    #[arg(long)]
+    pub user: Option<String>,
+
+    /// Replace the port (postgres, mysql, mariadb).
+    #[arg(long)]
+    pub port: Option<u16>,
+
+    /// Replace the database name (postgres, mysql, mariadb).
+    #[arg(long)]
+    pub database: Option<String>,
+
+    /// Replace the SQLite database path.
+    #[arg(long)]
+    pub path: Option<String>,
+
+    /// Replace the Turso connection URL.
+    #[arg(long)]
+    pub url: Option<String>,
+
+    /// Prompt for a replacement database password.
+    #[arg(long, default_value_t = false)]
+    pub password: bool,
+
+    /// Prompt for a replacement Turso auth token.
+    #[arg(long, default_value_t = false)]
+    pub token: bool,
+}
+
+#[derive(Debug, Args)]
 pub struct OpenCmdArgs {
     /// The name of the connection to open.
     pub connection_name: String,

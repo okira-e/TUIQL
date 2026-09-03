@@ -6,7 +6,7 @@ A fully-featured SQL database client that lives in your terminal. Fast, keyboard
 
 ## Why tuiql?
 
-Most terminal database tools are either too basic or painful to use. tuiql gives you the power of a native database client — table browsing, filtering, sorting, pagination, JSON viewing, theming — without ever leaving the terminal.
+Most terminal database tools are either too basic or painful to use. tuiql gives you the power of a native database client, table browsing, filtering, sorting, pagination, JSON viewing, theming, and more without ever leaving the terminal.
 
 No mouse required. No Electron. No waiting.
 
@@ -55,6 +55,14 @@ Rename a saved project (including its query history):
 ```sh
 tuiql rename mydb production
 ```
+
+Edit one or more details of a saved connection:
+
+```sh
+tuiql edit production --host db.internal --port 5433 --database analytics
+```
+
+Use `--password` or `--token` to securely prompt for a replacement credential.
 
 ## Keybindings
 

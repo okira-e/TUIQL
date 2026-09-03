@@ -10,7 +10,7 @@ use serde::Serialize;
 use std::fs;
 use std::fs::File;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Connection {
     pub name: String,
     pub kind: DbKind,
@@ -132,6 +132,29 @@ pub fn remove_connection(name: &str) -> Result<()> {
     // Remove the project file
 
     fs::remove_file(config_path.join("projects").join(format!("{}.json", name)))?;
+
+    return Ok(());
+}
+
+pub fn update_connection(name: &str, updated_connection: Connection) -> Result<()> {
+    if updated_connection.name != name {
+        bail!("Use the rename command to change a connection name");
+    }
+
+    let mut connections = load_connections()?;
+    let connection = match connections.iter_mut().find(|connection| connection.name == name) {
+        Some(connection) => connection,
+        None => bail!("Connection \"{}\" not found", name),
+    };
+
+    *connection = updated_connection;
+
+    let config_path = match get_config_dir_path_based_on_os()? {
+        Some(path) => path,
+        None => bail!("Unable to get config dir"),
+    };
+    let connections_file = File::create(config_path.join("connections.json"))?;
+    serde_json::to_writer_pretty(connections_file, &connections)?;
 
     return Ok(());
 }
