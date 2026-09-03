@@ -46,6 +46,15 @@ pub struct RemoveConnectionCmdArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct RenameProjectCmdArgs {
+    /// The current name of the saved project.
+    pub current_name: String,
+
+    /// The new name for the saved project.
+    pub new_name: String,
+}
+
+#[derive(Debug, Args)]
 pub struct SaveConnectionCmdArgs {
     /// The type of database: "postgres" | "mysql" | "mariadb" | "sqlite" | "turso".
     #[arg(long)]

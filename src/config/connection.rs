@@ -1,12 +1,14 @@
+use crate::config;
 use crate::config::get_config_dir_path_based_on_os;
 use crate::config::project::create_new_project_config;
+use crate::config::project::rename_project_config;
 use crate::drivers::kinds::DbKind;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
 use serde::Deserialize;
 use serde::Serialize;
+use std::fs;
 use std::fs::File;
-use std::path::PathBuf;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Connection {
@@ -43,17 +45,19 @@ pub fn load_connections() -> Result<Vec<Connection>> {
 }
 
 pub fn add_connection(conn: Connection) -> Result<()> {
+    config::project::validate_project_name(&conn.name)?;
+
+    //
+    // Get connections
+    //
+
     let config_path = match get_config_dir_path_based_on_os()? {
         Some(path) => path,
         None => bail!("Unable to get config dir"),
     };
 
-    // Add connection
-
     let connections_file_path = config_path.join("connections.json");
-    if !connections_file_path.exists() {
-        bail!("Connection file does not exist"); // Shouldn't happen.
-    }
+    assert!(connections_file_path.exists());
 
     let connections_file = match File::open(connections_file_path) {
         Ok(val) => val,
@@ -65,9 +69,26 @@ pub fn add_connection(conn: Connection) -> Result<()> {
         Err(err) => bail!("Failed to parse connection file: {}", err),
     };
 
-    let connection_name = conn.name.clone();
-    connections.push(conn);
+    // Check if a connection with the same name exists
+    for c in connections.iter() {
+        if conn.name == c.name {
+            bail!("A connection with the same name already exists!");
+        }
+    }
 
+    let connection_name = conn.name.clone();
+
+    //
+    // Add project config file
+    //
+
+    create_new_project_config(&connection_name)?;
+
+    //
+    // Add connection to connections.json
+    //
+
+    connections.push(conn);
     let connections_file = match File::create(config_path.join("connections.json")) {
         Ok(val) => val,
         Err(err) => bail!("Failed to open connection file: {}", err),
@@ -77,10 +98,6 @@ pub fn add_connection(conn: Connection) -> Result<()> {
         Ok(_) => {}
         Err(err) => bail!("Failed to write connection file: {}", err),
     };
-
-    // Add project config file
-
-    create_new_project_config(&connection_name)?;
 
     return Ok(());
 }
@@ -95,6 +112,8 @@ pub fn remove_connection(name: &str) -> Result<()> {
         bail!("Connection \"{}\" not found", name);
     }
 
+    // Remove the connection from the connections file
+
     let config_path = match get_config_dir_path_based_on_os()? {
         Some(path) => path,
         None => bail!("Unable to get config dir"),
@@ -110,19 +129,59 @@ pub fn remove_connection(name: &str) -> Result<()> {
         Err(err) => bail!("Failed to write connection file: {}", err),
     };
 
+    // Remove the project file
+
+    fs::remove_file(config_path.join("projects").join(format!("{}.json", name)))?;
+
     return Ok(());
 }
 
-fn connections_config_path(project: &str) -> Result<PathBuf> {
-    let config_path = match get_config_dir_path_based_on_os()? {
-        Some(path) => path,
-        None => bail!("Unable to get config dir"),
-    };
-
-    let path = config_path.join(format!("projects/{}.json", project));
-    if !path.exists() {
-        bail!("Project config file does not exist");
+pub fn rename_project(current_name: &str, new_name: &str) -> Result<()> {
+    if current_name == new_name {
+        bail!("The new project name must be different from the current name");
     }
 
-    return Ok(path);
+    let mut connections = load_connections()?;
+
+    let mut connection_index: Option<usize> = None;
+    for (i, con) in connections.iter().enumerate() {
+        if con.name == current_name {
+            connection_index = Some(i);
+        }
+    }
+
+    let connection_index = match connection_index {
+        Some(i) => i,
+        None => bail!("Project \"{}\" not found", current_name),
+    };
+
+    if connections.iter().any(|connection| connection.name == new_name) {
+        bail!("A project named \"{}\" already exists", new_name);
+    }
+
+    rename_project_config(current_name, new_name)?;
+
+    connections[connection_index].name = new_name.to_string();
+
+    let config_path = match get_config_dir_path_based_on_os()? {
+        Some(path) => path,
+        None => {
+            let _ = rename_project_config(new_name, current_name);
+            bail!("Unable to get config dir");
+        }
+    };
+
+    let connections_json = serde_json::to_string_pretty(&connections)?;
+    if let Err(err) = std::fs::write(config_path.join("connections.json"), connections_json) {
+        if let Err(rollback_err) = rename_project_config(new_name, current_name) {
+            bail!(
+                "Failed to save renamed project: {}. Also failed to restore its project config: {}",
+                err,
+                rollback_err
+            );
+        }
+        return Err(err.into());
+    }
+
+    return Ok(());
 }

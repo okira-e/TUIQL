@@ -50,6 +50,12 @@ List saved connections:
 tuiql ls
 ```
 
+Rename a saved project (including its query history):
+
+```sh
+tuiql rename mydb production
+```
+
 ## Keybindings
 
 ### Navigation

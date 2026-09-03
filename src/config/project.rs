@@ -5,6 +5,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::VecDeque;
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::PathBuf;
 
 const HISTORY_CAP: usize = 100;
@@ -48,6 +50,46 @@ pub fn load_project_config(project: &str) -> Result<ProjectConfig> {
     return Ok(obj);
 }
 
+pub fn rename_project_config(current_name: &str, new_name: &str) -> Result<()> {
+    validate_project_name(current_name)?;
+    validate_project_name(new_name)?;
+
+    if current_name == new_name {
+        bail!("The new project name must be different from the current name");
+    }
+
+    let config_path = match get_config_dir_path_based_on_os()? {
+        Some(path) => path,
+        None => bail!("Unable to get config dir"),
+    };
+    let current_path = project_config_path(current_name)?;
+    let new_path = config_path.join("projects").join(format!("{}.json", new_name));
+
+    if new_path.exists() {
+        bail!("A project named \"{}\" already exists", new_name);
+    }
+
+    let file = fs::File::open(&current_path)?;
+    let mut project_config: ProjectConfig = serde_json::from_reader(file)?;
+    project_config.name = new_name.to_string();
+
+    let project_config_json = serde_json::to_vec_pretty(&project_config)?;
+    let mut new_file = OpenOptions::new().write(true).create_new(true).open(&new_path)?;
+    if let Err(err) = new_file.write_all(&project_config_json) {
+        drop(new_file);
+        let _ = fs::remove_file(&new_path);
+        return Err(err.into());
+    }
+    drop(new_file);
+
+    if let Err(err) = fs::remove_file(&current_path) {
+        let _ = fs::remove_file(&new_path);
+        return Err(err.into());
+    }
+
+    return Ok(());
+}
+
 pub fn append_history(config: &mut ProjectConfig, command: String) -> Result<()> {
     if config.commands.history.len() >= HISTORY_CAP {
         config.commands.history.pop_back();
@@ -63,6 +105,8 @@ pub fn append_history(config: &mut ProjectConfig, command: String) -> Result<()>
 }
 
 fn project_config_path(project: &str) -> Result<PathBuf> {
+    validate_project_name(project)?;
+
     let config_path = match get_config_dir_path_based_on_os()? {
         Some(path) => path,
         None => bail!("Unable to get config dir"),
@@ -74,4 +118,12 @@ fn project_config_path(project: &str) -> Result<PathBuf> {
     }
 
     return Ok(path);
+}
+
+pub fn validate_project_name(name: &str) -> Result<()> {
+    if name.trim().is_empty() || name == ".." || name.contains(['/', '\\']) {
+        bail!("Project names cannot be empty or contain path separators");
+    }
+
+    return Ok(());
 }

@@ -4,11 +4,13 @@ use crate::app::App;
 use crate::cli::args::ConnectCmdArgs;
 use crate::cli::args::OpenCmdArgs;
 use crate::cli::args::RemoveConnectionCmdArgs;
+use crate::cli::args::RenameProjectCmdArgs;
 use crate::cli::args::SaveConnectionCmdArgs;
 use crate::config::connection::Connection;
 use crate::config::connection::add_connection;
 use crate::config::connection::load_connections;
 use crate::config::connection::remove_connection;
+use crate::config::connection::rename_project;
 use crate::config::get_config_dir_path_based_on_os;
 use crate::config::project::load_project_config;
 use crate::config::settings::load_settings;
@@ -37,6 +39,8 @@ pub enum Commands {
     /// Remove a saved connection by name.
     #[command(alias = "rm")]
     Remove(RemoveConnectionCmdArgs),
+    /// Rename a saved project and its connection.
+    Rename(RenameProjectCmdArgs),
 }
 
 pub async fn run(args: args::AppArgs) -> Result<()> {
@@ -71,6 +75,7 @@ async fn exec_command(command: Commands) -> Result<()> {
         Commands::List => list_connections(),
         Commands::Add(args) => save_connection(args).await,
         Commands::Remove(args) => remove_saved_connection(args),
+        Commands::Rename(args) => rename_saved_project(args),
     };
 }
 
@@ -247,6 +252,16 @@ async fn save_connection(args: args::SaveConnectionCmdArgs) -> Result<()> {
 fn remove_saved_connection(args: args::RemoveConnectionCmdArgs) -> Result<()> {
     remove_connection(&args.connection_name)?;
     println!("Successfully removed the connection.");
+
+    return Ok(());
+}
+
+fn rename_saved_project(args: args::RenameProjectCmdArgs) -> Result<()> {
+    rename_project(&args.current_name, &args.new_name)?;
+    println!(
+        "Successfully renamed project \"{}\" to \"{}\".",
+        args.current_name, args.new_name
+    );
 
     return Ok(());
 }
