@@ -18,6 +18,9 @@ pub enum Cmd {
     RefreshTable,
     Set(String, Option<String>),
     ChangeTheme(String),
+    SavePreset(String),
+    LoadPreset(String),
+    RemovePreset(String),
     OpenHelp,
 }
 
@@ -44,6 +47,9 @@ pub fn parse_cmd(input: &str) -> Result<Cmd> {
             "set" => parse_set_cmd(&mut iter),
             "theme" => parse_theme_cmd(&mut iter),
             "help" | "h" => Ok(Cmd::OpenHelp),
+            "save-preset" => parse_save_preset(&mut iter),
+            "load-preset" => parse_load_preset(&mut iter),
+            "remove-preset" => parse_remove_preset(&mut iter),
             _ => bail!("Unknown command: {}", cmd),
         },
         None => bail!("Empty command"),
@@ -143,7 +149,27 @@ fn parse_theme_cmd(iter: &mut SplitWhitespace) -> Result<Cmd> {
     };
 }
 
-// helper function
+fn parse_save_preset(iter: &mut SplitWhitespace) -> Result<Cmd> {
+    return match iter.next() {
+        Some(name) => Ok(Cmd::SavePreset(name.to_string())),
+        None => bail!("Command requires a name for the preset"),
+    };
+}
+
+fn parse_load_preset(iter: &mut SplitWhitespace) -> Result<Cmd> {
+    return match iter.next() {
+        Some(name) => Ok(Cmd::LoadPreset(name.to_string())),
+        None => bail!("Command requires a name for the preset"),
+    };
+}
+
+fn parse_remove_preset(iter: &mut SplitWhitespace) -> Result<Cmd> {
+    return match iter.next() {
+        Some(name) => Ok(Cmd::RemovePreset(name.to_string())),
+        None => bail!("Command requires a name for the preset"),
+    };
+}
+
 fn parse_metric(input: &str) -> Option<usize> {
     let (num, suffix) = input
         .trim()
@@ -286,5 +312,20 @@ mod tests {
         let result = parse_cmd("goto page 3.14");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Invalid page number"));
+    }
+
+    #[test]
+    fn test_parse_remove_preset_command() {
+        assert_eq!(
+            parse_cmd("remove-preset filtered-users").unwrap(),
+            Cmd::RemovePreset(String::from("filtered-users"))
+        );
+    }
+
+    #[test]
+    fn test_parse_remove_preset_requires_name() {
+        let result = parse_cmd("remove-preset");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("requires a name"));
     }
 }

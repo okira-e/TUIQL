@@ -256,6 +256,9 @@ impl App {
             Cmd::Set(key, value) => Ok(Action::Cmd(AppCmd::SettingChange(key, value))),
             Cmd::ChangeTheme(value) => Ok(Action::Cmd(AppCmd::ChangeTheme(value))),
             Cmd::OpenHelp => Ok(Action::App(AppAction::OpenHelp)),
+            Cmd::SavePreset(name) => Ok(Action::Cmd(AppCmd::SavePreset(name))),
+            Cmd::LoadPreset(name) => Ok(Action::Cmd(AppCmd::LoadPreset(name))),
+            Cmd::RemovePreset(name) => Ok(Action::Cmd(AppCmd::RemovePreset(name))),
         };
     }
 
@@ -285,7 +288,16 @@ impl App {
             columns.push(col.name.as_str());
         }
 
-        let ctx = CompletionContext { tables: tables.as_ref(), columns: columns.as_ref() };
+        let presets = match &self.config {
+            None => vec![],
+            Some(config) => config.presets.keys().cloned().collect(),
+        };
+
+        let ctx = CompletionContext {
+            tables: tables.as_ref(),
+            columns: columns.as_ref(),
+            preset_names: presets,
+        };
 
         self.statusline_model.completion.candidates = suggest(&ctx, &self.statusline_model.cmd.text);
         self.statusline_model.completion.selected = None;

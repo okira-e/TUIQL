@@ -93,26 +93,48 @@ Use `--password` or `--token` to securely prompt for a replacement credential.
 
 Press `:` to enter command mode.
 
-| Command           | Shorthand | Action                                                       |
-| ----------------- | --------- | ------------------------------------------------------------ |
-| help              | h         | Open the help view                                           |
-| quit              | q         | Quit the application                                         |
-| count             | c         | Count fetched rows                                           |
-| total-count       | tc        | Count total rows in the selected table regardless of filters |
-| goto page 5       | g p       | Jump to a specific page                                      |
-| goto table_name   | g         | Jump to a table by name                                      |
-| limit 1000\|1k    | l         | Set rows per page                                            |
-| refresh           | r         | Re-fetch data with current filters                           |
-| order-by col desc | ob        | Add ORDER BY (no args to reset)                              |
-| where col = 'val' | w         | Add WHERE clause (no args to reset)                          |
-| set key value     |           | Change a setting at runtime                                  |
-| theme name        |           | Change the current theme at runtime                          |
+| Command            | Shorthand | Action                                                       |
+| ------------------ | --------- | ------------------------------------------------------------ |
+| help               | h         | Open the help view                                           |
+| quit               | q         | Quit the application                                         |
+| count              | c         | Count fetched rows                                           |
+| total-count        | tc        | Count total rows in the selected table regardless of filters |
+| goto page 5        | g p       | Jump to a specific page                                      |
+| goto table_name    | g         | Jump to a table by name                                      |
+| limit 1000\|1k     | l         | Set rows per page                                            |
+| refresh            | r         | Re-fetch data with current filters                           |
+| order-by col desc  | ob        | Add ORDER BY (no args to reset)                              |
+| where col = 'val'  | w         | Add WHERE clause (no args to reset)                          |
+| save-preset name   |           | Save the current query state as a named preset               |
+| load-preset name   |           | Apply a preset and re-fetch the selected table               |
+| remove-preset name |           | Remove a saved preset                                        |
+| set key value      |           | Change a setting at runtime                                  |
+| theme name         |           | Change the current theme at runtime                          |
+
+### Query Presets
+
+Query presets save the current pagination and filtering state: the page offset, row limit, `WHERE` clause, and `ORDER BY` clause. Presets are stored in the saved project's configuration alongside its command history, so they are available the next time the project is opened.
+
+Presets are only available when the database was opened as a saved project with `tuiql open`. Preset names cannot contain spaces, and the current query state must differ from the defaults before it can be saved. Saving a duplicate name, or loading or removing a name that does not exist, reports an error.
+
+For example:
+
+```text
+:where status = 'active'
+:order-by created_at desc
+:limit 100
+:save-preset active-users
+
+:load-preset active-users
+:remove-preset active-users
+```
 
 ## Features
 
 - Built with Rust for instant startup and minimal resource usage
 - Vim-style navigation throughout the entire interface
 - Inline WHERE and ORDER BY filtering without writing full queries
+- Named query presets for saved projects
 - Paginated table browsing with configurable page sizes
 - JSON cell viewer for inspecting complex data
 - Customizable themes

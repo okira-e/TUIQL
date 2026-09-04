@@ -47,6 +47,7 @@ pub fn render_suggestions_popup(completion: &Completion, theme: &Theme, frame: &
                 SuggestionKind::Keyword => theme.fg,
                 SuggestionKind::Column => theme.selection,
                 SuggestionKind::Table => theme.pane_focus,
+                SuggestionKind::Preset => theme.pane_focus,
             };
 
             let style = if completion.selected == Some(i) {

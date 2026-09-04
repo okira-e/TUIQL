@@ -1,4 +1,5 @@
 use crate::app::App;
+use crate::config;
 use crate::config::settings::update_settings;
 use crate::models::table_model::QueryState;
 use color_eyre::eyre::Result;
@@ -76,6 +77,39 @@ impl App {
         self.settings = update_settings(&self.settings)?;
 
         return Ok(());
+    }
+
+    pub fn save_preset(&mut self, name: String, query_state: QueryState) -> Result<()> {
+        match &mut self.config {
+            None => bail!("Open this database as a saved project to use this feature"),
+            Some(config) => {
+                if query_state == QueryState::default() {
+                    bail!("No filters applied. Add some to save.")
+                }
+
+                config::project::save_preset(config, name, query_state)?;
+
+                return Ok(());
+            }
+        }
+    }
+
+    pub fn load_preset(&mut self, name: String) -> Result<QueryState> {
+        match &mut self.config {
+            None => bail!("Open this database as a saved project to use this feature"),
+            Some(config) => {
+                return config::project::load_preset(config, &name);
+            }
+        }
+    }
+
+    pub fn remove_preset(&mut self, name: String) -> Result<()> {
+        match &mut self.config {
+            None => bail!("Open this database as a saved project to use this feature"),
+            Some(config) => {
+                return config::project::remove_preset(config, &name);
+            }
+        }
     }
 }
 

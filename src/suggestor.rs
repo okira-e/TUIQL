@@ -7,6 +7,7 @@ pub enum SuggestionKind {
     Keyword,
     Column,
     Table,
+    Preset,
 }
 
 #[derive(Debug)]
@@ -18,6 +19,7 @@ pub struct Suggestion {
 pub struct CompletionContext<'a> {
     pub tables: &'a [&'a str],
     pub columns: &'a [&'a str],
+    pub preset_names: Vec<String>,
 }
 
 pub fn suggest(ctx: &CompletionContext, line: &str) -> Vec<Suggestion> {
@@ -69,6 +71,7 @@ fn resolve_source(command: &str, arg_index: usize, tokens: &[&str]) -> Option<So
         Source::Keywords(keywords) => Some(Source::Keywords(keywords)),
         Source::Tables => Some(Source::Tables),
         Source::Columns => Some(Source::Columns),
+        Source::Presets => Some(Source::Presets),
         Source::TableOrKeyword(keywords) => Some(Source::TableOrKeyword(keywords)),
         Source::SettingKey(keys) => Some(Source::SettingKey(keys)),
     };
@@ -92,6 +95,11 @@ fn expand(source: Source, ctx: &CompletionContext) -> Vec<Suggestion> {
             .chain(ctx.tables.iter().map(|t| make(t, SuggestionKind::Table)))
             .collect(),
         Source::SettingKey(keys) => keys.iter().map(|k| make(k, SuggestionKind::Keyword)).collect(),
+        Source::Presets => ctx
+            .preset_names
+            .iter()
+            .map(|p| make(p, SuggestionKind::Preset))
+            .collect(),
     };
 }
 
@@ -117,6 +125,7 @@ enum Source {
     Keywords(&'static [&'static str]),
     Tables,
     Columns,
+    Presets,
     TableOrKeyword(&'static [&'static str]),
     SettingKey(&'static [&'static str]),
 }
@@ -142,8 +151,14 @@ const COMMANDS: &[Spec] = &[
     Spec { names: &["limit", "l"], slots: &[] }, // number, no candidates
     Spec { names: &["refresh"], slots: &[] },
     Spec { names: &["set"], slots: &[Source::SettingKey(SETTINGS)] },
-    Spec { names: &["theme"], slots: &[Source::SettingKey(Theme::options())] },
+    Spec {
+        names: &["theme"],
+        slots: &[Source::SettingKey(Theme::options())],
+    },
     Spec { names: &["help"], slots: &[] },
+    Spec { names: &["save-preset"], slots: &[Source::Presets] },
+    Spec { names: &["load-preset"], slots: &[Source::Presets] },
+    Spec { names: &["remove-preset"], slots: &[Source::Presets] },
 ];
 
 // @Settings

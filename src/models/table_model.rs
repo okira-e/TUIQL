@@ -4,6 +4,8 @@ use crate::settings::Settings;
 use crate::settings::default_limit;
 use ratatui::layout::Constraint;
 use ratatui::widgets::TableState;
+use serde::Deserialize;
+use serde::Serialize;
 use serde_json::Value;
 
 pub const TEXT_CELL_WIDTH: usize = 30;
@@ -102,7 +104,7 @@ impl TableModel {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct QueryState {
     pub offset: usize,
     pub limit: usize,

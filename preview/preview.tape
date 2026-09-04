@@ -1,11 +1,11 @@
-Output ../assets/demo.gif
+Output assets/demo.gif
 
 Set Shell "bash"
 Set FontSize 18
 Set Width 1600
 Set Height 1000
 Set Padding 20
-Set Theme "catppuccin-mocha"
+Set Theme "ayu"
 
 Require tuiql
 
@@ -32,6 +32,12 @@ Type@120ms ":where country_id >= 100"
 Enter
 Sleep 1.5s
 
+Type@130ms ":"
+Sleep 0.5s
+Type@120ms "save-preset by-country"
+Enter
+Sleep 1.4s
+
 Down@200ms 3
 Sleep 800ms
 
@@ -43,4 +49,4 @@ Sleep 1s
 
 Type@100ms ":help"
 Enter
-Sleep 2.5s
+Sleep 3.5s

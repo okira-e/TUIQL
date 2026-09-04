@@ -1031,6 +1031,50 @@ impl App {
                 self.theme = theme.as_str().parse().unwrap();
                 self.focus_pane(self.prev_focused_pane);
             }
+            AppCmd::SavePreset(name) => {
+                match self.save_preset(name, self.table_model.query_state.clone()) {
+                    Err(err) => {
+                        self.report_message(&err.to_string(), MsgKind::Error, MsgLifetime::Long);
+                    }
+                    Ok(_) => {
+                        self.report_message("Preset saved", MsgKind::Success, MsgLifetime::Short);
+                    }
+                }
+
+                self.focus_pane(self.prev_focused_pane);
+            }
+            AppCmd::LoadPreset(name) => {
+                match self.load_preset(name.clone()) {
+                    Err(err) => self.report_message(&err.to_string(), MsgKind::Error, MsgLifetime::Long),
+                    Ok(query_state) => {
+                        self.table_model.query_state = query_state;
+                        self.update_db(DbAction::QueryTable);
+                        self.report_message(
+                            &format!("Preset \"{}\" loaded", { name }),
+                            MsgKind::Success,
+                            MsgLifetime::Short,
+                        );
+                    }
+                };
+
+                self.focus_pane(self.prev_focused_pane);
+            }
+            AppCmd::RemovePreset(name) => {
+                match self.remove_preset(name.clone()) {
+                    Err(err) => {
+                        self.report_message(&err.to_string(), MsgKind::Error, MsgLifetime::Long);
+                    }
+                    Ok(_) => {
+                        self.report_message(
+                            &format!("Preset \"{}\" removed", { name }),
+                            MsgKind::Success,
+                            MsgLifetime::Short,
+                        );
+                    }
+                }
+
+                self.focus_pane(self.prev_focused_pane);
+            }
         };
     }
 

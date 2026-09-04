@@ -1,8 +1,10 @@
 use crate::config::get_config_dir_path_based_on_os;
+use crate::models::table_model::QueryState;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs;
 use std::fs::OpenOptions;
@@ -15,11 +17,17 @@ const HISTORY_CAP: usize = 100;
 pub struct ProjectConfig {
     pub name: String,
     pub commands: ProjectConfigCommands,
+    #[serde(default = "HashMap::new")]
+    pub presets: HashMap<String, QueryState>,
 }
 
 impl ProjectConfig {
     pub fn new(name: &str) -> Self {
-        return Self { name: name.to_string(), commands: Default::default() };
+        return Self {
+            name: name.to_string(),
+            commands: Default::default(),
+            presets: HashMap::new(),
+        };
     }
 }
 
@@ -100,6 +108,31 @@ pub fn append_history(config: &mut ProjectConfig, command: String) -> Result<()>
     let file_path = project_config_path(&config.name)?;
     let file = std::fs::File::create(file_path)?;
     serde_json::to_writer_pretty(file, config)?;
+
+    return Ok(());
+}
+
+pub fn save_preset(config: &mut ProjectConfig, name: String, query_state: QueryState) -> Result<()> {
+    if config.presets.contains_key(&name) {
+        bail!(format!("Preset with the name \"{}\" already exists", name));
+    }
+
+    config.presets.insert(name, query_state);
+
+    return Ok(());
+}
+
+pub fn load_preset(config: &ProjectConfig, name: &str) -> Result<QueryState> {
+    return match config.presets.get(name) {
+        None => bail!("Preset with the name \"{name}\" does not exist"),
+        Some(v) => Ok(v.clone()),
+    };
+}
+
+pub fn remove_preset(config: &mut ProjectConfig, name: &str) -> Result<()> {
+    if config.presets.remove(name).is_none() {
+        bail!("Preset with the name \"{name}\" does not exist");
+    }
 
     return Ok(());
 }
