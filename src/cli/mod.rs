@@ -1,5 +1,6 @@
 pub mod args;
 
+use crate::app;
 use crate::app::App;
 use crate::cli::args::ConnectCmdArgs;
 use crate::cli::args::EditConnectionCmdArgs;
@@ -91,9 +92,9 @@ async fn run_app(db_driver: DbDriver, project_name: Option<&str>) -> Result<()> 
         Some(proj) => Some(load_project_config(proj)?),
     };
     let mut app = App::new(settings, db_driver, project_config).await;
-    app.init().await?;
+    app::init(&mut app).await?;
     let terminal = ratatui::init();
-    let result = app.run(terminal).await;
+    let result = app::run(app, terminal).await;
     ratatui::restore();
 
     return result;

@@ -1,3 +1,4 @@
+use crate::app;
 use crate::app::App;
 use crate::app::RightView;
 use crate::app::View;
@@ -12,81 +13,77 @@ use ratatui::Frame;
 use ratatui::style::Style;
 use ratatui::widgets::Block;
 
-impl App {
-    pub fn render(&mut self, frame: &mut Frame) {
-        // This is here to make sure that layout is as fresh as possible before drawing since we take the
-        // definitive frame in this function. Otherwise, a race condition may exist in app.run.
-        self.calculate_widgets_chunks(frame.area().width, frame.area().height);
+pub fn render(app: &mut App, frame: &mut Frame) {
+    // This is here to make sure that layout is as fresh as possible before drawing since we take the
+    // definitive frame in this function. Otherwise, a race condition may exist in app.run.
+    app::calculate_widgets_chunks(app);
 
-        // Set app-wide background
-        let bg = if self.settings.transparent_background {
-            Block::default()
-        } else {
-            Block::default().style(Style::default().bg(self.theme.bg))
-        };
+    // Set app-wide background
+    let bg = if app.settings.transparent_background {
+        Block::default()
+    } else {
+        Block::default().style(Style::default().bg(app.theme.bg))
+    };
 
-        frame.render_widget(bg, frame.area());
-        let focused_view = self.get_focused_view();
+    frame.render_widget(bg, frame.area());
+    let focused_view = app::get_focused_view(app);
 
-        // Render left pane
-        render_explorer(
-            &mut self.explorer_model,
-            &self.theme,
-            frame,
-            self.widgets_chunks.explorer_chunk,
-            focused_view == View::Explorer,
-        );
+    // Render left pane
+    render_explorer(
+        &mut app.explorer_model,
+        &app.theme,
+        frame,
+        app.widgets_chunks.explorer_chunk,
+        focused_view == View::Explorer,
+    );
 
-        // Render right pane
-        match self.right_view {
-            RightView::JsonView => {
-                render_json_view(
-                    &self.json_view_model,
-                    &self.theme,
-                    frame,
-                    self.widgets_chunks.json_view_chunk,
-                    focused_view == View::JsonView,
-                );
-            }
-            RightView::ResultsTable => {
-                render_table(
-                    &mut self.table_model,
-                    &self.theme,
-                    frame,
-                    self.widgets_chunks.table_chunk,
-                    focused_view == View::ResultsTable,
-                    &self.settings.default_sort,
-                );
-            }
-            RightView::Help => {
-                render_help_view(
-                    &self.help_view_model,
-                    &self.theme,
-                    frame,
-                    self.widgets_chunks.help_view_chunk,
-                    focused_view == View::Help,
-                );
-            }
-        }
-
-        render_statusline(
-            &self.statusline_model,
-            &self.theme,
-            frame,
-            self.widgets_chunks.statusline_chunk,
-            focused_view == View::StatusLine,
-            self.is_loading,
-        );
-
-        if self.statusline_model.mode == StatusLineMode::Command
-            && !self.statusline_model.completion.candidates.is_empty()
-        {
-            render_suggestions_popup(
-                &self.statusline_model.completion,
-                &self.theme,
+    // Render right pane
+    match app.right_view {
+        RightView::JsonView => {
+            render_json_view(
+                &app.json_view_model,
+                &app.theme,
                 frame,
-                self.widgets_chunks.statusline_chunk,
+                app.widgets_chunks.json_view_chunk,
+                focused_view == View::JsonView,
             );
         }
+        RightView::ResultsTable => {
+            render_table(
+                &mut app.table_model,
+                &app.theme,
+                frame,
+                app.widgets_chunks.table_chunk,
+                focused_view == View::ResultsTable,
+                &app.settings.default_sort,
+            );
+        }
+        RightView::Help => {
+            render_help_view(
+                &app.help_view_model,
+                &app.theme,
+                frame,
+                app.widgets_chunks.help_view_chunk,
+                focused_view == View::Help,
+            );
+        }
+    }
+
+    render_statusline(
+        &app.statusline_model,
+        &app.theme,
+        frame,
+        app.widgets_chunks.statusline_chunk,
+        focused_view == View::StatusLine,
+        app.is_loading,
+    );
+
+    if app.statusline_model.mode == StatusLineMode::Command && !app.statusline_model.completion.candidates.is_empty() {
+        render_suggestions_popup(
+            &app.statusline_model.completion,
+            &app.theme,
+            frame,
+            app.widgets_chunks.statusline_chunk,
+        );
     }
 }

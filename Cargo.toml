@@ -1,6 +1,6 @@
 [package]
 name = "tuiql"
-version = "0.4.0"
+version = "0.5.0"
 description = "SQL database client in your terminal."
 authors = ["Omar <omarrafat60@gmail.com>"]
 license = "MIT"

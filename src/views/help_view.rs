@@ -85,6 +85,18 @@ pub fn get_help_rows() -> (Vec<HelpRow>, Vec<usize>) {
                     key: ":where expr / :w",
                     text: "Add WHERE clause (no args to reset)",
                 },
+                HelpItem {
+                    key: ":save-preset name",
+                    text: "Save filters for the selected table",
+                },
+                HelpItem {
+                    key: ":load-preset name",
+                    text: "Load filters for the selected table",
+                },
+                HelpItem {
+                    key: ":remove-preset name",
+                    text: "Remove a preset from the selected table",
+                },
                 HelpItem { key: ":set key value", text: "Change a setting at runtime" },
             ],
         },

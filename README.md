@@ -113,9 +113,9 @@ Press `:` to enter command mode.
 
 ### Query Presets
 
-Query presets save the current pagination and filtering state: the page offset, row limit, `WHERE` clause, and `ORDER BY` clause. Presets are stored in the saved project's configuration alongside its command history, so they are available the next time the project is opened.
+Query presets belong to the currently selected table and save its row limit, `WHERE` clause, and `ORDER BY` clause. Loading a preset starts from the first page and re-fetches that table. Presets are stored in the saved project's configuration alongside its command history, so they are available the next time the project is opened.
 
-Presets are only available when the database was opened as a saved project with `tuiql open`. Preset names cannot contain spaces, and the current query state must differ from the defaults before it can be saved. Saving a duplicate name, or loading or removing a name that does not exist, reports an error.
+Presets are only available when the database was opened as a saved project with `tuiql open`. Preset names cannot contain spaces, and the current query state must differ from the defaults before it can be saved. A name can be reused for different tables, but duplicate names on the same table are rejected. Loading or removing a name that does not exist for the selected table reports an error.
 
 For example:
 

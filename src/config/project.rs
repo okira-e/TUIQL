@@ -2,6 +2,7 @@ use crate::config::get_config_dir_path_based_on_os;
 use crate::models::table_model::QueryState;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
+use color_eyre::eyre::eyre;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -17,6 +18,13 @@ const HISTORY_CAP: usize = 100;
 pub struct ProjectConfig {
     pub name: String,
     pub commands: ProjectConfigCommands,
+    #[serde(default = "Default::default")]
+    pub presets: Vec<Preset>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct Preset {
+    pub table_name: String,
     #[serde(default = "HashMap::new")]
     pub presets: HashMap<String, QueryState>,
 }
@@ -26,7 +34,7 @@ impl ProjectConfig {
         return Self {
             name: name.to_string(),
             commands: Default::default(),
-            presets: HashMap::new(),
+            presets: Default::default(),
         };
     }
 }
@@ -112,26 +120,62 @@ pub fn append_history(config: &mut ProjectConfig, command: String) -> Result<()>
     return Ok(());
 }
 
-pub fn save_preset(config: &mut ProjectConfig, name: String, query_state: QueryState) -> Result<()> {
-    if config.presets.contains_key(&name) {
-        bail!(format!("Preset with the name \"{}\" already exists", name));
-    }
+pub fn save_preset(
+    config: &mut ProjectConfig,
+    table_name: &str,
+    name: String,
+    mut query_state: QueryState,
+) -> Result<()> {
+    query_state.offset = 0;
 
-    config.presets.insert(name, query_state);
+    if let Some(table_presets) = config.presets.iter_mut().find(|preset| preset.table_name == table_name) {
+        if table_presets.presets.contains_key(&name) {
+            bail!("Preset with the name \"{name}\" already exists for table \"{table_name}\"");
+        }
+
+        table_presets.presets.insert(name, query_state);
+    } else {
+        let mut presets = HashMap::new();
+        presets.insert(name, query_state);
+        config
+            .presets
+            .push(Preset { table_name: table_name.to_string(), presets });
+    }
 
     return Ok(());
 }
 
-pub fn load_preset(config: &ProjectConfig, name: &str) -> Result<QueryState> {
-    return match config.presets.get(name) {
-        None => bail!("Preset with the name \"{name}\" does not exist"),
-        Some(v) => Ok(v.clone()),
-    };
+pub fn load_preset(config: &ProjectConfig, table_name: &str, name: &str) -> Result<QueryState> {
+    let table_presets = config
+        .presets
+        .iter()
+        .find(|preset| preset.table_name == table_name)
+        .ok_or_else(|| eyre!("Preset with the name \"{name}\" does not exist for table \"{table_name}\""))?;
+
+    let mut query_state = table_presets
+        .presets
+        .get(name)
+        .cloned()
+        .ok_or_else(|| eyre!("Preset with the name \"{name}\" does not exist for table \"{table_name}\""))?;
+    query_state.offset = 0;
+
+    return Ok(query_state);
 }
 
-pub fn remove_preset(config: &mut ProjectConfig, name: &str) -> Result<()> {
-    if config.presets.remove(name).is_none() {
-        bail!("Preset with the name \"{name}\" does not exist");
+pub fn remove_preset(config: &mut ProjectConfig, table_name: &str, name: &str) -> Result<()> {
+    let table_index = config
+        .presets
+        .iter()
+        .position(|preset| preset.table_name == table_name)
+        .ok_or_else(|| eyre!("Preset with the name \"{name}\" does not exist for table \"{table_name}\""))?;
+
+    let table_presets = &mut config.presets[table_index];
+    if table_presets.presets.remove(name).is_none() {
+        bail!("Preset with the name \"{name}\" does not exist for table \"{table_name}\"");
+    }
+
+    if table_presets.presets.is_empty() {
+        config.presets.remove(table_index);
     }
 
     return Ok(());
@@ -159,4 +203,84 @@ pub fn validate_project_name(name: &str) -> Result<()> {
     }
 
     return Ok(());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn query_state(offset: usize, where_clause: &str) -> QueryState {
+        return QueryState {
+            offset,
+            limit: 50,
+            order_by_clause: Some(String::from("id desc")),
+            where_clause: Some(where_clause.to_string()),
+        };
+    }
+
+    #[test]
+    fn presets_are_scoped_by_table_and_reset_offset() {
+        let mut config = ProjectConfig::new("test");
+
+        save_preset(
+            &mut config,
+            "users",
+            String::from("active"),
+            query_state(100, "active = true"),
+        )
+        .unwrap();
+        save_preset(
+            &mut config,
+            "orders",
+            String::from("active"),
+            query_state(200, "paid = true"),
+        )
+        .unwrap();
+
+        let users = load_preset(&config, "users", "active").unwrap();
+        let orders = load_preset(&config, "orders", "active").unwrap();
+
+        assert_eq!(users.offset, 0);
+        assert_eq!(users.where_clause.as_deref(), Some("active = true"));
+        assert_eq!(orders.offset, 0);
+        assert_eq!(orders.where_clause.as_deref(), Some("paid = true"));
+    }
+
+    #[test]
+    fn duplicate_preset_names_are_rejected_only_within_the_same_table() {
+        let mut config = ProjectConfig::new("test");
+        save_preset(
+            &mut config,
+            "users",
+            String::from("active"),
+            query_state(0, "active = true"),
+        )
+        .unwrap();
+
+        let result = save_preset(
+            &mut config,
+            "users",
+            String::from("active"),
+            query_state(0, "active = false"),
+        );
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn removing_the_last_preset_removes_its_table_group() {
+        let mut config = ProjectConfig::new("test");
+        save_preset(
+            &mut config,
+            "users",
+            String::from("active"),
+            query_state(0, "active = true"),
+        )
+        .unwrap();
+
+        remove_preset(&mut config, "users", "active").unwrap();
+
+        assert!(config.presets.is_empty());
+    }
 }

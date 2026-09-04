@@ -7,6 +7,7 @@ use crate::commander::parse_cmd;
 use crate::config::project::ProjectConfig;
 use crate::drivers;
 use crate::drivers::DbDriver;
+use crate::events;
 use crate::models::explorer_model::ExplorerItem;
 use crate::models::explorer_model::ExplorerItemKind;
 use crate::models::explorer_model::ExplorerModel;
@@ -19,6 +20,7 @@ use crate::models::statusline_model::StatusLineModel;
 use crate::models::statusline_model::StatusLineMsg;
 use crate::models::table_model::QueryState;
 use crate::models::table_model::TableModel;
+use crate::render;
 use crate::settings::Settings;
 use crate::suggestor::CompletionContext;
 use crate::suggestor::suggest;
@@ -95,7 +97,7 @@ pub struct App {
 }
 
 impl App {
-    pub async fn new(settings: Settings, db_driver: drivers::DbDriver, config: Option<ProjectConfig>) -> Self {
+    pub async fn new(settings: Settings, db_driver: drivers::DbDriver, config: Option<ProjectConfig>) -> App {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
 
         let theme: Theme = match settings.theme.parse() {
@@ -110,7 +112,7 @@ impl App {
             None
         };
 
-        return Self {
+        return App {
             settings: settings,
             config: config,
             running: false,
@@ -132,174 +134,181 @@ impl App {
             prev_focused_pane: Pane::Left,
         };
     }
+}
 
-    pub async fn init(&mut self) -> Result<()> {
-        // Populate the explorer state.
-        self.populate_explorer_state().await?;
+pub async fn init(app: &mut App) -> Result<()> {
+    // Populate the explorer state.
+    populate_explorer_state(app).await?;
 
-        return Ok(());
+    return Ok(());
+}
+
+async fn populate_explorer_state(app: &mut App) -> Result<()> {
+    let driver = app.db_driver.lock().await;
+    let tables: Vec<String> = driver.get_tables().await?;
+    let views: Vec<String> = driver.get_views().await?;
+    let materialized: Vec<String> = driver.get_materialized_views().await?;
+    drop(driver); // unlock the mutex
+
+    let tables: Vec<ExplorerItem> = tables
+        .iter()
+        .enumerate()
+        .map(|(i, name)| ExplorerItem { name: name.clone(), kind: ExplorerItemKind::Table, index: i })
+        .collect();
+
+    let views: Vec<ExplorerItem> = views
+        .iter()
+        .enumerate()
+        .map(|(i, name)| ExplorerItem { name: name.clone(), kind: ExplorerItemKind::View, index: i })
+        .collect();
+
+    let materialized: Vec<ExplorerItem> = materialized
+        .iter()
+        .enumerate()
+        .map(|(i, name)| ExplorerItem {
+            name: name.clone(),
+            kind: ExplorerItemKind::MaterializedView,
+            index: i,
+        })
+        .collect();
+
+    let items: Vec<_> = tables.into_iter().chain(views).chain(materialized).collect();
+
+    app.explorer_model.items = items;
+    if !app.explorer_model.items.is_empty() {
+        app.explorer_model.focused_item = Some(app.explorer_model.items[0].clone());
+        app.explorer_model.table_state.select(Some(0));
     }
 
-    async fn populate_explorer_state(&mut self) -> Result<()> {
-        let driver = self.db_driver.lock().await;
-        let tables: Vec<String> = driver.get_tables().await?;
-        let views: Vec<String> = driver.get_views().await?;
-        let materialized: Vec<String> = driver.get_materialized_views().await?;
-        drop(driver); // unlock the mutex
+    return Ok(());
+}
 
-        let tables: Vec<ExplorerItem> = tables
-            .iter()
-            .enumerate()
-            .map(|(i, name)| ExplorerItem { name: name.clone(), kind: ExplorerItemKind::Table, index: i })
-            .collect();
+pub async fn run(mut app: App, mut terminal: DefaultTerminal) -> Result<()> {
+    app.running = true;
+    let size = terminal.size()?;
+    app.area = Rect::new(0, 0, size.width, size.height);
+    calculate_widgets_chunks(&mut app);
 
-        let views: Vec<ExplorerItem> = views
-            .iter()
-            .enumerate()
-            .map(|(i, name)| ExplorerItem { name: name.clone(), kind: ExplorerItemKind::View, index: i })
-            .collect();
+    while app.running {
+        events::handle_events(&mut app).await?;
 
-        let materialized: Vec<ExplorerItem> = materialized
-            .iter()
-            .enumerate()
-            .map(|(i, name)| ExplorerItem {
-                name: name.clone(),
-                kind: ExplorerItemKind::MaterializedView,
-                index: i,
-            })
-            .collect();
+        terminal.draw(|frame| {
+            render::render(&mut app, frame);
+        })?;
+    }
 
-        let items: Vec<_> = tables.into_iter().chain(views).chain(materialized).collect();
+    return Ok(());
+}
 
-        self.explorer_model.items = items;
-        if !self.explorer_model.items.is_empty() {
-            self.explorer_model.focused_item = Some(self.explorer_model.items[0].clone());
-            self.explorer_model.table_state.select(Some(0));
+pub fn quit(app: &mut App) {
+    app.running = false;
+}
+
+pub fn calculate_widgets_chunks(app: &mut App) {
+    let app_statusline_split = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Max(1)])
+        .split(Rect { x: 0, y: 0, width: app.area.width, height: app.area.height });
+
+    let explorer_table_split = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(25), Constraint::Min(1)])
+        .split(app_statusline_split[0]);
+
+    let (explorer_split, table_split) = (explorer_table_split[0], explorer_table_split[1]);
+
+    app.widgets_chunks.explorer_chunk = explorer_split;
+    app.widgets_chunks.table_chunk = table_split;
+    app.widgets_chunks.json_view_chunk = table_split;
+    app.widgets_chunks.help_view_chunk = table_split;
+    app.widgets_chunks.statusline_chunk = app_statusline_split[1];
+}
+
+pub fn report_message(app: &mut App, text: &str, kind: MsgKind, lifetime: MsgLifetime) {
+    app.statusline_model.mode = StatusLineMode::Status;
+    app.statusline_model.msg = StatusLineMsg {
+        text: text.into(),
+        kind,
+        lifetime,
+        created_at: std::time::Instant::now(),
+    };
+}
+
+pub fn get_focused_view(app: &App) -> View {
+    return match app.focused_pane {
+        Pane::Left => View::Explorer,
+        Pane::Right => match app.right_view {
+            RightView::ResultsTable => View::ResultsTable,
+            RightView::JsonView => View::JsonView,
+            RightView::Help => View::Help,
+        },
+        Pane::StatusLine => View::StatusLine,
+    };
+}
+
+pub fn evaluate_app_action_from_cmd(cmd: &str) -> Result<Action> {
+    return match parse_cmd(cmd)? {
+        Cmd::Quit => Ok(Action::App(AppAction::Quit)),
+        Cmd::Count => Ok(Action::Cmd(AppCmd::Count)),
+        Cmd::TotalCount => Ok(Action::Cmd(AppCmd::TotalCount)),
+        Cmd::Goto(sub_cmd) => Ok(Action::Cmd(AppCmd::Goto(sub_cmd))),
+        Cmd::OrderBy(clause) => Ok(Action::Cmd(AppCmd::OrderBy(clause))),
+        Cmd::Where(clause) => Ok(Action::Cmd(AppCmd::Where(clause))),
+        Cmd::Limit(limit) => Ok(Action::Cmd(AppCmd::Limit(limit))),
+        Cmd::RefreshTable => Ok(Action::Db(DbAction::QueryTable)),
+        Cmd::Set(key, value) => Ok(Action::Cmd(AppCmd::SettingChange(key, value))),
+        Cmd::ChangeTheme(value) => Ok(Action::Cmd(AppCmd::ChangeTheme(value))),
+        Cmd::OpenHelp => Ok(Action::App(AppAction::OpenHelp)),
+        Cmd::SavePreset(name) => Ok(Action::Cmd(AppCmd::SavePreset(name))),
+        Cmd::LoadPreset(name) => Ok(Action::Cmd(AppCmd::LoadPreset(name))),
+        Cmd::RemovePreset(name) => Ok(Action::Cmd(AppCmd::RemovePreset(name))),
+    };
+}
+
+pub fn focus_pane(app: &mut App, pane: Pane) {
+    app.prev_focused_pane = app.focused_pane;
+    app.focused_pane = pane;
+}
+
+pub fn select_table(app: &mut App, name: String) {
+    app.table_model.table_name = Some(name.clone());
+    app.table_model.reset_ui(Some(0));
+    app.table_model.query_state = QueryState::new(&app.settings);
+
+    let _ = app.action_tx.send(Action::Db(DbAction::QueryTable));
+}
+
+pub fn refresh_suggestions(app: &mut App) {
+    let mut tables: Vec<&'_ str> = Vec::with_capacity(app.explorer_model.items.len());
+    for item in app.explorer_model.items.iter() {
+        if item.kind == ExplorerItemKind::Table {
+            tables.push(item.name.as_str());
         }
-
-        return Ok(());
     }
 
-    pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
-        self.running = true;
-        let size = terminal.size()?;
-        self.area = Rect::new(0, 0, size.width, size.height);
-        self.calculate_widgets_chunks(self.area.width, self.area.height);
-
-        while self.running {
-            self.handle_events().await?;
-
-            terminal.draw(|frame| {
-                self.render(frame);
-            })?;
-        }
-
-        return Ok(());
+    let mut columns: Vec<&'_ str> = Vec::with_capacity(app.table_model.query_result.columns.len());
+    for col in app.table_model.query_result.columns.iter() {
+        columns.push(col.name.as_str());
     }
 
-    pub fn quit(&mut self) {
-        self.running = false;
-    }
+    let mut presets_for_table = vec![];
 
-    pub fn calculate_widgets_chunks(&mut self, width: u16, height: u16) {
-        let app_statusline_split = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Max(1)])
-            .split(Rect { x: 0, y: 0, width, height });
-
-        let explorer_table_split = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(25), Constraint::Min(1)])
-            .split(app_statusline_split[0]);
-
-        let (explorer_split, table_split) = (explorer_table_split[0], explorer_table_split[1]);
-
-        self.widgets_chunks.explorer_chunk = explorer_split;
-        self.widgets_chunks.table_chunk = table_split;
-        self.widgets_chunks.json_view_chunk = table_split;
-        self.widgets_chunks.help_view_chunk = table_split;
-        self.widgets_chunks.statusline_chunk = app_statusline_split[1];
-    }
-
-    pub fn report_message(&mut self, text: &str, kind: MsgKind, lifetime: MsgLifetime) {
-        self.statusline_model.mode = StatusLineMode::Status;
-        self.statusline_model.msg = StatusLineMsg {
-            text: text.into(),
-            kind,
-            lifetime,
-            created_at: std::time::Instant::now(),
-        };
-    }
-
-    pub fn get_focused_view(&self) -> View {
-        return match self.focused_pane {
-            Pane::Left => View::Explorer,
-            Pane::Right => match self.right_view {
-                RightView::ResultsTable => View::ResultsTable,
-                RightView::JsonView => View::JsonView,
-                RightView::Help => View::Help,
-            },
-            Pane::StatusLine => View::StatusLine,
-        };
-    }
-
-    pub fn evaluate_app_action_from_cmd(&mut self, cmd: &str) -> Result<Action> {
-        return match parse_cmd(cmd)? {
-            Cmd::Quit => Ok(Action::App(AppAction::Quit)),
-            Cmd::Count => Ok(Action::Cmd(AppCmd::Count)),
-            Cmd::TotalCount => Ok(Action::Cmd(AppCmd::TotalCount)),
-            Cmd::Goto(sub_cmd) => Ok(Action::Cmd(AppCmd::Goto(sub_cmd))),
-            Cmd::OrderBy(clause) => Ok(Action::Cmd(AppCmd::OrderBy(clause))),
-            Cmd::Where(clause) => Ok(Action::Cmd(AppCmd::Where(clause))),
-            Cmd::Limit(limit) => Ok(Action::Cmd(AppCmd::Limit(limit))),
-            Cmd::RefreshTable => Ok(Action::Db(DbAction::QueryTable)),
-            Cmd::Set(key, value) => Ok(Action::Cmd(AppCmd::SettingChange(key, value))),
-            Cmd::ChangeTheme(value) => Ok(Action::Cmd(AppCmd::ChangeTheme(value))),
-            Cmd::OpenHelp => Ok(Action::App(AppAction::OpenHelp)),
-            Cmd::SavePreset(name) => Ok(Action::Cmd(AppCmd::SavePreset(name))),
-            Cmd::LoadPreset(name) => Ok(Action::Cmd(AppCmd::LoadPreset(name))),
-            Cmd::RemovePreset(name) => Ok(Action::Cmd(AppCmd::RemovePreset(name))),
-        };
-    }
-
-    pub fn focus_pane(&mut self, pane: Pane) {
-        self.prev_focused_pane = self.focused_pane;
-        self.focused_pane = pane;
-    }
-
-    pub fn select_table(&mut self, name: String) {
-        self.table_model.table_name = Some(name.clone());
-        self.table_model.reset_ui(Some(0));
-        self.table_model.query_state = QueryState::new(&self.settings);
-
-        let _ = self.action_tx.send(Action::Db(DbAction::QueryTable));
-    }
-
-    pub fn refresh_suggestions(&mut self) {
-        let mut tables: Vec<&'_ str> = Vec::with_capacity(self.explorer_model.items.len());
-        for item in self.explorer_model.items.iter() {
-            if item.kind == ExplorerItemKind::Table {
-                tables.push(item.name.as_str());
+    if let Some(config) = &app.config {
+        if let Some(table_name) = &app.table_model.table_name {
+            for preset in config.presets.iter() {
+                if &preset.table_name == table_name {
+                    presets_for_table = preset.presets.keys().cloned().collect();
+                }
             }
         }
-
-        let mut columns: Vec<&'_ str> = Vec::with_capacity(self.table_model.query_result.columns.len());
-        for col in self.table_model.query_result.columns.iter() {
-            columns.push(col.name.as_str());
-        }
-
-        let presets = match &self.config {
-            None => vec![],
-            Some(config) => config.presets.keys().cloned().collect(),
-        };
-
-        let ctx = CompletionContext {
-            tables: tables.as_ref(),
-            columns: columns.as_ref(),
-            preset_names: presets,
-        };
-
-        self.statusline_model.completion.candidates = suggest(&ctx, &self.statusline_model.cmd.text);
-        self.statusline_model.completion.selected = None;
     }
+
+    let ctx = CompletionContext {
+        tables: tables.as_ref(),
+        columns: columns.as_ref(),
+        preset_names: presets_for_table,
+    };
+
+    app.statusline_model.completion.candidates = suggest(&ctx, &app.statusline_model.cmd.text);
+    app.statusline_model.completion.selected = None;
 }

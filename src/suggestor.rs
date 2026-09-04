@@ -156,7 +156,7 @@ const COMMANDS: &[Spec] = &[
         slots: &[Source::SettingKey(Theme::options())],
     },
     Spec { names: &["help"], slots: &[] },
-    Spec { names: &["save-preset"], slots: &[Source::Presets] },
+    Spec { names: &["save-preset"], slots: &[] },
     Spec { names: &["load-preset"], slots: &[Source::Presets] },
     Spec { names: &["remove-preset"], slots: &[Source::Presets] },
 ];
